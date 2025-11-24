@@ -5,8 +5,7 @@
 .vscode/ipch
 .vscode/extensions.json
 .env
-/include/credentials.h
+include/credentials.h
 test
 info
 lib
-include/credentials.h
