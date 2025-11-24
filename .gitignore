@@ -3,8 +3,10 @@
 .vscode/c_cpp_properties.json
 .vscode/launch.json
 .vscode/ipch
+.vscode/extensions.json
 .env
-include/credentials.h
+/include/credentials.h
 test
 info
 lib
+include/credentials.h
