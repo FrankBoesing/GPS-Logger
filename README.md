@@ -39,7 +39,11 @@ Die Tx(ESP) -> Rx(GPS) ist optional und wird derzeit nur bei UBLOX benutzt.
 - **`include/`**: Header-Dateien (`config.h`, ...).
 
 **Build**
-- In pioarduino: Buld Filesystem Image -> Upload Filesystem Image -> Build and Upload Program
+- In pioarduino:
+  1. copy include/credentials.h.example to include/credentials.h and edit the SSID and Password
+  2. Build Filesystem Image
+  3. Upload Filesystem Image
+  4. Build and Upload Program
 
 **Web-Oberfläche**
 - **Dateien**: Öffne `http://gps.local/` oder über den Access Point mit `http://192.168.4.1/`
