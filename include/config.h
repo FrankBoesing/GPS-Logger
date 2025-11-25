@@ -25,7 +25,7 @@
 #define AP_SSID "GPS-Logger"
 #define AP_PASS "12345678"
 #define HOSTNAME "gps"
-#define WiFI_MAX_POWER 7      // dBm, max 20 (ESP32-C3 Noname Boards oft am besten mit 8 dBm. Höhere Werte bringen meist nichts)
+#define WiFI_MAX_POWER 8      // dBm, max 20 (ESP32-C3 Noname Boards oft am besten mit ~8 dBm. Höhere Werte bringen meist nichts)
 #define WiFi_POWER_MODE WIFI_PS_MAX_MODEM
 
 // ---------- Speicher ----------
