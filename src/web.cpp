@@ -87,9 +87,9 @@ void setupWebServer()
             {
               if (isBadRequest(request,"logMode")) return;
 
-              uint mode = request->getParam("logMode")->value().toInt();
-              if (mode <= 2) {
-                logMode = (eLogMode)mode;
+              eLogMode mode = (eLogMode)request->getParam("logMode")->value().toInt();
+              if (mode <= LogAfterMinSpeed) {
+                logMode = mode;
                 savePrefs();
               }
               else request->send(400, "texte/plain", "Error");
@@ -100,19 +100,20 @@ void setupWebServer()
             {
               if (isBadRequest(request,"logActive")) return;
 
-              uint mode = request->getParam("logActive")->value().toInt();
-              if (logCmd==nope && mode > 0 && mode <= 2) {
-                logCmd = (eLogCmd)(mode);
+              eLogCmd mode = (eLogCmd)request->getParam("logActive")->value().toInt();
+              if (logCmd==nope &&
+                  ((mode == startNow && gpsFixQuality > '0') || (mode == stopNow)) ) {
+
+                logCmd = mode;
 
                 //logCMD wird nun im Hauptprogramm ausgeführt.
-                #if 0
-                do { // Kein timeout nötig.. wenn was schief läuft, ist sowieso alles kaputt. So merkt es der Anwender wenigstens schnell.
+                #if 1
+                do { // Kein timeout nötig.. wenn was schief läuft, ist sowieso alles kaputt. So merkt der Anwender es wenigstens schnell.
                   vTaskDelay(20 / portTICK_PERIOD_MS);
                 } while(logCmd != nope);
                 #endif
               } else
                 request->send(400, "text/plain", "Error");
-
               request->send(200, "text/plain", "OK"); });
 
   /**********************/
