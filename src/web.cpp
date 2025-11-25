@@ -105,10 +105,11 @@ void setupWebServer()
                 logCmd = (eLogCmd)(mode);
 
                 //logCMD wird nun im Hauptprogramm ausgeführt.
+                #if 0
                 do { // Kein timeout nötig.. wenn was schief läuft, ist sowieso alles kaputt. So merkt es der Anwender wenigstens schnell.
                   vTaskDelay(20 / portTICK_PERIOD_MS);
                 } while(logCmd != nope);
-
+                #endif
               } else
                 request->send(400, "text/plain", "Error");
 

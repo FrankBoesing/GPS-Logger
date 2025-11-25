@@ -8,11 +8,11 @@ SemaphoreHandle_t jsonMutex;
 // ESP32 hat kein timegm implementiert. Reparatur:
 
 static long _offset_seconds = 0;
-const long& offset_seconds = _offset_seconds; //make ist readonly
+const long& offset_seconds = _offset_seconds; //make it readonly
 
 time_t timegm(struct tm *tm) // initTimeOffset muss vorher aufgerufen worden sein
 {
-  return mktime(tm) + offset_seconds; // TODO: Prüfen ob das wirklich UTC ist
+  return mktime(tm) + offset_seconds;
 }
 
 void initTimeOffset() // setzt voraus, dass die lokale Zeitzone schon gesetzt wurde.
@@ -27,6 +27,34 @@ void initTimeOffset() // setzt voraus, dass die lokale Zeitzone schon gesetzt wu
   _offset_seconds = local_epoch - utc_epoch;
   log_v("TZ Offset: %d", offset_seconds);
 }
+
+/****************************************************************************************************************************/
+
+// Fehlerbehandlung: Gibt eine Fehlermeldung aus und bleibt in einer Endlosschleife
+void error(const char *msg)
+{
+  while (true) {
+    log_e("Fehler: %s", msg);
+    delay(2000);
+  }
+}
+
+//Beim Booten prüfen ob GPS verbunden ist.
+bool isGPSConnected()
+{
+  constexpr const unsigned long gpsConnectTimeout = 2000; // 2 Sekunden
+  constexpr const unsigned long minNumChars = 20;
+
+  unsigned long start = millis();
+
+  while (GPSSerial.available() < minNumChars && millis()-start < gpsConnectTimeout)
+  {
+    vTaskDelay(10 / portTICK_PERIOD_MS);
+  }
+
+  return GPSSerial.available() > 0;
+}
+
 
 /****************************************************************************************************************************/
 

@@ -11,10 +11,14 @@ void initTimeOffset();
 time_t timegm(struct tm *tm);
 extern const long& offset_seconds;
 
+ bool isGPSConnected();
+
 //bool endsWith(const char *str, const char *suffix);
 String findFile(const bool newest, const char *fileext);
 
 void readFileList(JsonObject& fileList);
 int deleteFiles(const char *filename);
 
+
+[[noreturn]] void error(const char *msg);
 #endif

@@ -11,9 +11,8 @@
 #include "web.h"
 #include "credentials.h"
 
-// TODO: Status im Webinterface erweitern: Uptime, sowie aktuell gefahrene km? Km/h!
-// TODO: UI: Dateiliste nur laden wenn nötig.
-// TODO: Wichtig: Gleichzeitige Zugriffe vermeiden. Download / delete nur wenn logging abgeschaltet ist.
+// TODO: Dringend: Button für sofort start nur aktivieren wenn GPS-Fix da ist!
+// TODO: Status im Webinterface erweitern. Flash Belegung
 // IDEE: WLAN abschalten wenn in Bewegung? Nach x Minuten?  WiFi.disconnect(true); WiFi.mode(WIFI_OFF); -> Km/h Anzeige nicht möglich.
 // IDEE: Datenkomprimierung -> keine Anzeige der Dateigröße möglich... statdessen prozentual bzw kb?
 
@@ -275,7 +274,6 @@ static void handleGPSData()
 
   if (newData)
   {
-    // Serial.print(".");
     syncTimeFromGPS();
     saveToGPSLog();
     logGPSInfo();
@@ -300,13 +298,11 @@ void setup()
   xSemaphoreGive(semFile);
 
   if (!LittleFS.begin(false))
-  {
-    while (true)
-    {
-      log_e("LittleFS Fehler!");
-      delay(2000);
-    }
-  }
+    error("LittleFS Fehler!");
+
+  if (!LittleFS.exists("/web/index.html"))
+    error("LittleFS: WEBUI nicht vorhanden");
+
   _fsTotalBytes = LittleFS.totalBytes();
 
   setenv("TZ", TIMEZONE, 1);
@@ -325,6 +321,10 @@ void setup()
   setupWebServer();
 
   GPSSerial.begin(GPS_BAUD, SERIAL_8N1, GPS_RX_PIN, GPS_TX_PIN);
+
+  if (!isGPSConnected())
+    error("GPS nicht verbunden!");
+
   hwinit();
 
   log_i("Setup abgeschlossen.");
