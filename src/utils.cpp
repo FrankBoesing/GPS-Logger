@@ -36,9 +36,7 @@ void error(const char *msg)
   while (true) {
     log_e("Fehler: %s", msg);
     for (int i = 0; i < 5; i++) {
-      LEDON();
-      delay(250);
-      LEDOFF();
+      TOGGLELED();
       delay(200);
     }
   }

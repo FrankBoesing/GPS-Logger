@@ -313,6 +313,8 @@ void setup()
   WiFi.mode(WIFI_AP_STA);
   WiFi.setAutoReconnect(true);
   WiFi.begin(WIFI_SSID, WIFI_PASS);
+  esp_wifi_set_max_tx_power(WiFI_MAX_POWER * 4);
+  esp_wifi_set_ps(WiFi_POWER_MODE);
   WiFi.softAP(AP_SSID, AP_PASS);
   MDNS.begin(HOSTNAME);
   MDNS.addService("http", "tcp", 80);

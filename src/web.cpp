@@ -152,6 +152,7 @@ void setupWebServer()
                 return;
               }
 
+              esp_wifi_set_ps(WIFI_PS_NONE);
               //constexpr size_t CHUNK_SIZE = TCP_MSS; // 1436
               constexpr size_t CHUNK_SIZE = 1460;
               constexpr uint NUM_BUF = 2;
@@ -249,7 +250,7 @@ void setupWebServer()
 
                 if (toSend >= activeLen) {
 
-                  uint idx = (1 + ctx->bufIdx) % NUM_BUF; // Buffer wechseln
+                  uint idx = (1 + ctx->bufIdx) & (NUM_BUF-1); // Buffer wechseln
                   ctx->len[idx] = fillBuffer(ctx->buf[idx], sizeof(ctx->buf[0]));
                   ctx->bufIdx = idx;
 
@@ -268,7 +269,9 @@ void setupWebServer()
               char disp[128];
               snprintf(disp, sizeof(disp), "attachment; filename=\"%s\"", path);
               response->addHeader("Content-Disposition", disp);
-              request->send(response); });
+              request->send(response);
+              esp_wifi_set_ps(WiFi_POWER_MODE);
+            });
 
   /**********************/
 

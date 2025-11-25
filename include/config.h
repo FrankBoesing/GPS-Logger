@@ -2,6 +2,7 @@
 #define CONFIG_H
 #include <Arduino.h>
 #include <LittleFS.h>
+#include <esp_wifi.h>
 
 #define TIMEZONE "CET-1CEST,M3.5.0/2,M10.5.0/3" // Zeitzone Berlin, Amsterdam
 
@@ -19,11 +20,13 @@
 #define DEFAULTLOGMODE NoLog                            // (s.u.)
 #define MIN_SPEED_TO_START 5.0f                         // Mindestgeschwindigkeit (KM/H) um loggen zu starten
 
-// ---------- WLAN ----------
+// ---------- WiFi ----------
 
 #define AP_SSID "GPS-Logger"
 #define AP_PASS "12345678"
 #define HOSTNAME "gps"
+#define WiFI_MAX_POWER 7      // dBm, max 20 (ESP32-C3 Noname Boards oft am besten mit 8 dBm. Höhere Werte bringen meist nichts)
+#define WiFi_POWER_MODE WIFI_PS_MAX_MODEM
 
 // ---------- Speicher ----------
 
