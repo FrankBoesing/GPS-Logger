@@ -21,6 +21,7 @@ Der ESP-C3 ist so klein, dass er nicht zählt und die Größe wird durch den GPS
 
 Mit 4MB Flash beträgt die Speicherzeit über **50 Stunden**. Bei Modellen mit mehr Flash sollte die `partitions.csv` gewechselt werden.
 
+![Screenshot der Hauptseite](./doc/Indexpage.png)
 
 **Hardware & Anforderungen**
 - **Board**: ESP32-kompatibles Board.
@@ -54,3 +55,5 @@ Die Tx(ESP) -> Rx(GPS) ist optional und wird derzeit nur bei UBLOX benutzt.
 **Projektkonfiguration**
 - Alle Einstellungen wie WLAN, GPS-Pins etc. stehen in `include/config.h`.
 - Persistente Log-Optionen werden mittels `Preferences` (NVS) gespeichert — z. B. `logMode`.
+
+![Screenshot der Statusseite](./doc/Statuspage.png)
