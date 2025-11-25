@@ -1,32 +1,39 @@
 <!DOCTYPE html>
 <html lang="de">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="stylesheet" href="style.css">
-  <title>GPS Logger</title>
-</head>
-<body>
-  <div class="container">
-    <h1>🏍️ GPS Logger</h1>
-    <p>Dateiübersicht</p>
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<link rel="stylesheet" href="style.css" />
+		<title>GPS Logger</title>
+	</head>
+	<body>
+		<div class="container">
+			<h1>🏍️ GPS Logger</h1>
+			<p>Dateiübersicht</p>
 
-    <nav class="nav">
-      <a href="index.html" class="nav-link">Dateien</a>
-      <a href="status.html" class="nav-link">Status</a>
-    </nav>
+			<nav class="nav">
+				<a href="index.html" class="nav-link">Dateien</a>
+				<a href="status.html" class="nav-link">Status</a>
+			</nav>
 
-    <div class="actions">
-      <button id="refreshBtn">🔄 Aktualisieren</button>
-      <button id="toggleLogBtn">⏺️ Log starten</button>
-    </div>
+			<div class="actions">
+				<button id="refreshBtn">🔄 Aktualisieren</button>
+				<button id="toggleLogBtn">⏺️ Log starten</button>
+			</div>
 
-    <table id="fileTable">
-      <thead><tr><th>Dateiname</th><th>Dauer</th><th></th></tr></thead>
-      <tbody></tbody>
-    </table>
+			<table id="fileTable">
+				<thead>
+					<tr>
+						<th>Dateiname</th>
+						<th>Dauer</th>
+						<th></th>
+					</tr>
+				</thead>
+				<tbody></tbody>
+			</table>
 
-    <footer id="footer">lade...</footer>
-  </div>
-  <script src="script.js"></script>
-</body></html>
+			<footer id="footer">lade...</footer>
+		</div>
+		<script src="script.js"></script>
+	</body>
+</html>
