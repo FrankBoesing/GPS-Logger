@@ -4,6 +4,7 @@
 #include <ESPAsyncWebServer.h>
 
 #include "utils.h"
+#include "debug.h"
 
 extern char gpsFixQuality;
 void savePrefs();
@@ -104,14 +105,16 @@ void setupWebServer()
               if (logCmd==nope &&
                   ((mode == startNow && gpsFixQuality > '0') || (mode == stopNow)) ) {
 
-                logCmd = mode;
+                logCmd = mode; // logCMD wird nun im Hauptprogramm ausgeführt.
 
-                //logCMD wird nun im Hauptprogramm ausgeführt.
                 #if 1
-                do { // Kein timeout nötig.. wenn was schief läuft, ist sowieso alles kaputt. So merkt der Anwender es wenigstens schnell.
+                LEDON();
+                do { // Kein Timeout nötig.. wenn was schief läuft, ist sowieso alles kaputt. So merkt der Anwender es wenigstens schnell.
                   vTaskDelay(20 / portTICK_PERIOD_MS);
                 } while(logCmd != nope);
+                LEDOFF();
                 #endif
+
               } else
                 request->send(400, "text/plain", "Error");
               request->send(200, "text/plain", "OK"); });

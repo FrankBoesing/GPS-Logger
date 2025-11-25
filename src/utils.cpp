@@ -35,7 +35,12 @@ void error(const char *msg)
 {
   while (true) {
     log_e("Fehler: %s", msg);
-    delay(2000);
+    for (int i = 0; i < 5; i++) {
+      LEDON();
+      delay(250);
+      LEDOFF();
+      delay(200);
+    }
   }
 }
 

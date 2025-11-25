@@ -11,10 +11,9 @@
 #include "web.h"
 #include "credentials.h"
 
-// TODO: Dringend: Button für sofort start nur aktivieren wenn GPS-Fix da ist!
-// TODO: Status im Webinterface erweitern. Flash Belegung
+// TODO: Status im Webinterface erweitern. Flash Belegung. Build-Datum.
 // IDEE: WLAN abschalten wenn in Bewegung? Nach x Minuten?  WiFi.disconnect(true); WiFi.mode(WIFI_OFF); -> Km/h Anzeige nicht möglich.
-// IDEE: Datenkomprimierung -> keine Anzeige der Dateigröße möglich... statdessen prozentual bzw kb?
+// IDEE: Datenkomprimierung(?) -> keine Anzeige der Dateigröße möglich... statdessen prozentual bzw kb?
 
 File currentFile;
 SemaphoreHandle_t semFile;
