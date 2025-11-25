@@ -86,6 +86,15 @@ bool handleHwData(char ch)
 /****************************************************************************************************************************/
 // UBX Commands beim Start
 
+// Page 256, UBX-CFG-RST
+static const uint8_t UBX_CFG_RST_data[] = {0xff, 0xff, 0x02, 00};
+static const ubxfmt UBX_CFG_RST = {
+    .ubxclass = 0x06,
+    .id = 0x04,
+    .len = 4,
+    .payloadused = sizeof(UBX_CFG_RST_data),
+    .data = (uint8_t *)UBX_CFG_RST_data};
+
 // Page 231, Navigation engine setting  UBX-CFG-NAV5: Automotive
 static const uint8_t UBX_CFG_NAV5_data[] = {1, 0, 4};
 static const ubxfmt UBX_CFG_NAV5 = {
@@ -145,6 +154,9 @@ void hwinit()
     ubxsend(UBX_CFG_MSG_$GNVTG); // VTG
     ubxsend(UBX_CFG_MSG_$GNGSA); // GSA
     ubxsend(UBX_CFG_MSG_$GNGLL); // GLL
+
+    if (0) //Nur für Debugzwecke
+        ubxsend(UBX_CFG_RST);
 }
 
 

@@ -37,6 +37,7 @@ button {
 button:hover { background: #00bfff; color: #000; }
 button.danger { background: #600; }
 button.danger:hover { background: #f33; }
+button.disabled { background: #313131; color: #808080}
 
 table { width: 100%; border-collapse: collapse; }
 th, td { padding: 10px; border-bottom: 1px solid #333; text-align: left; }

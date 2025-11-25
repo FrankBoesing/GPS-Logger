@@ -95,6 +95,18 @@ async function loadFooter(d) {
       tb.textContent = '⏺️ Sofort starten';
       tb.classList.add('danger');
     }
+    // Toggle nur aktiv, wenn ein GPS-Fix vorhanden ist (gpsQuality > 0)
+    if (typeof data.gpsQuality !== 'undefined') {
+      const hasFix = Number(data.gpsQuality) > 0;
+      tb.disabled = !hasFix;
+      if (!hasFix) {
+        tb.textContent = 'Kein Fix';
+        tb.classList.add('disabled');
+      } else {
+        tb.title = '';
+        tb.classList.remove('disabled');
+      }
+    }
   }
 }
 
