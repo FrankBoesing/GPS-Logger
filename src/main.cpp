@@ -58,7 +58,7 @@ static void openLogFile()
     time_t now;
     time(&now);
 
-    String fname = findFile(true, FILE_SUFFIX);
+    String fname = findFile(true);
     xSemaphoreTake(semFile, portMAX_DELAY);
     File f = LittleFS.open(fname, FILE_READ);
     time_t lastWritten = f.getLastWrite();
@@ -74,21 +74,14 @@ static void openLogFile()
 
   if (!currentFile)
   {
-    char filename[64];
+    char filename[32];
     time_t now;
-    struct tm tm;
     time(&now);
-    localtime_r(&now, &tm);
+    now = now + offset_seconds; // to local time
 
-    if (tm.tm_year >= 2025 - 1900)
-    {
-      strftime(filename, sizeof(filename), FILE_PREFIX "%Y%m%d_%H%M" FILE_SUFFIX, &tm);
-    }
-    else
-    {
-      log_v("Uhrzeit ungültig. Verwende temporären Dateinamen");
-      snprintf(filename, sizeof(filename), FILE_PREFIX "TEMP_%lu" FILE_SUFFIX, millis());
-    }
+    // use time as filename:
+    snprintf(filename, sizeof(filename), FILE_PREFIX "%lld" FILE_SUFFIX, now);
+
     xSemaphoreTake(semFile, portMAX_DELAY);
     currentFile = LittleFS.open(filename, FILE_WRITE);
     log_i("Neues Logfile: %s", filename);

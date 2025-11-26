@@ -8,7 +8,7 @@ SemaphoreHandle_t jsonMutex;
 // ESP32 hat kein timegm implementiert. Reparatur:
 
 static long _offset_seconds = 0;
-const long& offset_seconds = _offset_seconds; //make it readonly
+const long &offset_seconds = _offset_seconds; // make it readonly
 
 time_t timegm(struct tm *tm) // initTimeOffset muss vorher aufgerufen worden sein
 {
@@ -30,37 +30,6 @@ void initTimeOffset() // setzt voraus, dass die lokale Zeitzone schon gesetzt wu
 
 /****************************************************************************************************************************/
 
-// Fehlerbehandlung: Gibt eine Fehlermeldung aus und bleibt in einer Endlosschleife
-void error(const char *msg)
-{
-  while (true) {
-    log_e("Fehler: %s", msg);
-    for (int i = 0; i < 5; i++) {
-      TOGGLELED();
-      delay(200);
-    }
-  }
-}
-
-//Beim Booten prüfen ob GPS verbunden ist.
-bool isGPSConnected()
-{
-  constexpr const unsigned long gpsConnectTimeout = 2000; // 2 Sekunden
-  constexpr const unsigned long minNumChars = 20;
-
-  unsigned long start = millis();
-
-  while (GPSSerial.available() < minNumChars && millis()-start < gpsConnectTimeout)
-  {
-    vTaskDelay(10 / portTICK_PERIOD_MS);
-  }
-
-  return GPSSerial.available() > 0;
-}
-
-
-/****************************************************************************************************************************/
-
 static bool endsWith(const char *str, const char *suffix)
 {
   if (!str || !suffix)
@@ -72,9 +41,48 @@ static bool endsWith(const char *str, const char *suffix)
   return strncmp(str + lenstr - lensuffix, suffix, lensuffix) == 0;
 }
 
+bool str_to_ll(const char *str, long long *out)
+{
+  constexpr const long long LL_MAX_VAL = LONG_LONG_MAX;
+  constexpr const long long LL_MIN_VAL = LONG_LONG_MIN;
+
+  while (isspace((unsigned char)*str))
+    str++;
+
+  int neg = 0;
+  if (*str == '+')
+  {
+    str++;
+  }
+  else if (*str == '-')
+  {
+    neg = 1;
+    str++;
+  }
+
+  if (!isdigit((unsigned char)*str))
+    return false;
+
+  long long value = 0;
+  const long long cutoff = neg ? -(LL_MIN_VAL / 10) : (LL_MAX_VAL / 10);
+  const int cutlim = neg ? -(LL_MIN_VAL % 10) : (LL_MAX_VAL % 10);
+
+  for (; *str; str++)
+  {
+    if (!isdigit((unsigned char)*str))
+      break;
+    int digit = *str - '0';
+    if (value > cutoff || (value == cutoff && digit > cutlim))
+      return 0;
+    value = value * 10 + digit;
+  }
+
+  *out = neg ? -value : value;
+  return true;
+}
 /****************************************************************************************************************************/
 // Refresh the file list and write as JSON to FILELIST_PATH
-void readFileList(JsonObject &fileList)
+void readFileList(JsonObject &fileList, const char *fileext)
 {
   xSemaphoreTake(semFile, portMAX_DELAY);
 
@@ -87,12 +95,12 @@ void readFileList(JsonObject &fileList)
   File f = root.openNextFile();
   while (f)
   {
-    if (f.size() > 0)
+    if (f.size() > 0 && endsWith(f.name(), fileext))
     {
       JsonObject obj = arr.add<JsonObject>();
       obj["name"] = f.name();
       obj["len"] = f.size();
-      //obj["lastWrite"] = f.getLastWrite();
+      // obj["lastWrite"] = f.getLastWrite();
       obj["active"] = (currentFile && strcmp(currentFile.name(), f.name()) == 0);
     }
     f.close();
@@ -191,4 +199,36 @@ String findFile(const bool newest, const char *fileext)
   xSemaphoreGive(semFile);
 
   return bestName;
+}
+
+/****************************************************************************************************************************/
+
+// Prüfen ob GPS verbunden ist.
+bool isGPSConnected()
+{
+  constexpr const unsigned long gpsConnectTimeout = 2000; // 2 Sekunden
+  constexpr const unsigned long minNumChars = 20;
+
+  unsigned long start = millis();
+
+  while (GPSSerial.available() < minNumChars && millis() - start < gpsConnectTimeout)
+  {
+    vTaskDelay(10 / portTICK_PERIOD_MS);
+  }
+
+  return GPSSerial.available() > 0;
+}
+
+// Fehlerbehandlung: Gibt eine Fehlermeldung aus und bleibt in einer Endlosschleife
+void error(const char *msg)
+{
+  while (true)
+  {
+    log_e("Fehler: %s", msg);
+    for (int i = 0; i < 5; i++)
+    {
+      TOGGLELED();
+      delay(200);
+    }
+  }
 }

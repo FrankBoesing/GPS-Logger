@@ -32,12 +32,10 @@
 
 #define FILES_WEB_DIR "/web/"
 #define FILECACHE_MAXPOINTS 10
-#define FILE_PREFIX "/" // oder etwas wie "/log_"
-#define FILE_SUFFIX ".gpx"
-#define FILE_SUFFIX_RAW ".raw"
 
-#define FILE_DELETE_OLDEST true  // Falls der Platz im Flash knapp wird, älteste Datei löschen
-#define FILE_MIN_FREE_FLASH 4096 // Feier Speicher Mindestgröße
+#define FILE_DONWNLOAD_NAME "%F_%H-%m.gpx" // Name der Downloads, stftime Format https://man7.org/linux/man-pages/man3/strftime.3.html
+//#define FILE_DELETE_OLDEST true  // Falls der Platz im Flash knapp wird, älteste Datei löschen //TODO: noch nicht implementiert
+//#define FILE_MIN_FREE_FLASH 4096 // Feier Speicher Mindestgröße
 
 #define RESTART_AFTER_IDLE true         // Nach einer Fahrtpause an die letzte Datei anhängen?
 #define MAX_IDLE_SECONDS (120UL * 60UL) // Max. Pausenlänge - danach wird eine neue Datei erstellt.

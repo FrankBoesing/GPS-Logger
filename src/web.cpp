@@ -96,7 +96,7 @@ void setupWebServer()
               else request->send(400, "texte/plain", "Error");
               request->send(200, "texte/plain", "OK"); });
 
-  //Sofortige Aktionen
+  // Sofortige Aktionen
   server.on("/setlogactive", HTTP_GET, [](AsyncWebServerRequest *request)
             {
               if (isBadRequest(request,"logActive")) return;
@@ -107,13 +107,13 @@ void setupWebServer()
 
                 logCmd = mode; // logCMD wird nun im Hauptprogramm ausgeführt.
 
-                #if 1
+#if 1
                 LEDON();
                 do { // Kein Timeout nötig.. wenn was schief läuft, ist sowieso alles kaputt. So merkt der Anwender es wenigstens schnell.
                   vTaskDelay(20 / portTICK_PERIOD_MS);
                 } while(logCmd != nope);
                 LEDOFF();
-                #endif
+#endif
 
               } else
                 request->send(400, "text/plain", "Error");
@@ -138,7 +138,7 @@ void setupWebServer()
             {
               if (isBadRequest(request, _argFile)) return;
 
-              String pathParam = request->getParam(_argFile)->value();
+              String pathParam = FILE_PREFIX + request->getParam(_argFile)->value();
               const char *path = pathParam.c_str();
 
               if (currentFile && strcmp(currentFile.name(), path) == 0) {
@@ -266,12 +266,19 @@ void setupWebServer()
               AsyncWebServerResponse *response =
                   request->beginChunkedResponse("application/gpx+xml", generator);
 
-              char disp[128];
-              snprintf(disp, sizeof(disp), "attachment; filename=\"%s\"", path);
-              response->addHeader("Content-Disposition", disp);
+
+              //Lesbaren Dateinamen erzeugen:
+              time_t _time;
+              // sscanf(path, FILE_PREFIX "%lld", &_time); // +1 um führenden Slash zu überspringen
+              str_to_ll(path + strlen(FILE_PREFIX), &_time); //FILE_PREFIX überspringen
+              struct tm _t = *gmtime(&_time);
+
+              char dlname[64];
+              strftime(dlname, sizeof(dlname), "attachment; filename=\"" FILE_DONWNLOAD_NAME "\"", &_t);
+
+              response->addHeader("Content-Disposition", dlname);
               request->send(response);
-              esp_wifi_set_ps(WiFi_POWER_MODE);
-            });
+              esp_wifi_set_ps(WiFi_POWER_MODE); });
 
   /**********************/
 
