@@ -19,7 +19,7 @@ Normalerweise sollte der Logger eine "black box" sein und in einem Autostart Mod
 
 Der ESP-C3 ist so klein, dass er nicht zählt und die Größe wird durch den GPS-Empfänger bestimmt. (Ich habe beides, und die Antenne, in eine größere TicTac Dose eingebaut. Passt sammt Stromversorgung unter den Sitz meines Bikes.)
 
-Mit 4MB Flash beträgt die Speicherzeit über **50 Stunden**. Bei Modellen mit mehr Flash sollte die `partitions.csv` gewechselt werden.
+Mit 4MB Flash beträgt die Speicherzeit über **50 Stunden** (LittleFS). Bei Modellen mit mehr Flash sollte die `partitions.csv` gewechselt werden.
 
 ![Screenshot der Hauptseite](./doc/Indexpage.png)
 
