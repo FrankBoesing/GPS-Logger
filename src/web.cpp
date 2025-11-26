@@ -303,8 +303,3 @@ void setupWebServer()
 
   server.begin();
 }
-
-/*
-if (LITTLEFS.exists("/index.html.gz")) {
-  server.serveStatic("/", LITTLEFS, "/index.html.gz", "text/html", "Content-Encoding: gzip");
-}*/
