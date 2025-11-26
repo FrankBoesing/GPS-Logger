@@ -4,7 +4,7 @@
 - **Beschreibung**: Ein einfacher GPS-Logger zum Einbau in Fahrzeuge, der GPS‑Positionen binär im LittleFS speichert, über ein eingebettetes Web‑UI verwaltet, und bei Download "on the fly" ins *.gpx Format umwandelt.
 
 Der (Async-)Webserver, gedacht fürs Mobiltelefon, bietet Tourenliste, Download- und Steuerfunktionen.
-Normalerweise sollte der Logger eine "black box" sein und in einem Autostart Modus laufen. Eine Bedienung über die UI ist nur dann notwendig wenn eine GPX Datei heruntergeladen oder gelöscht werden soll.
+Normalerweise sollte der Logger eine "black box" sein und in einem Autostart Modus laufen. Eine Bedienung über die UI ist nur dann notwendig wenn eine GPX Datei heruntergeladen oder gelöscht werden soll.<img src="./doc/ESP32_GPS-Logger.png" align="right" width="250" />
 
 * Es gibt die Modi:
    * Kein Autostart
