@@ -64,16 +64,11 @@ bool str_to_ll(const char *str, long long *out)
     return false;
 
   long long value = 0;
-  const long long cutoff = neg ? -(LL_MIN_VAL / 10) : (LL_MAX_VAL / 10);
-  const int cutlim = neg ? -(LL_MIN_VAL % 10) : (LL_MAX_VAL % 10);
-
   for (; *str; str++)
   {
     if (!isdigit((unsigned char)*str))
       break;
     int digit = *str - '0';
-    if (value > cutoff || (value == cutoff && digit > cutlim))
-      return 0;
     value = value * 10 + digit;
   }
 

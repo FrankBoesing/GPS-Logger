@@ -77,7 +77,6 @@ static void openLogFile()
     char filename[32];
     time_t now;
     time(&now);
-    now = now + offset_seconds; // to local time
 
     // use time as filename:
     snprintf(filename, sizeof(filename), FILE_PREFIX "%lld" FILE_SUFFIX, now);

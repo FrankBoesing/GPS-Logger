@@ -271,7 +271,7 @@ void setupWebServer()
               time_t _time;
               // sscanf(path, FILE_PREFIX "%lld", &_time); // +1 um führenden Slash zu überspringen
               str_to_ll(path + strlen(FILE_PREFIX), &_time); //FILE_PREFIX überspringen
-              struct tm _t = *gmtime(&_time);
+              struct tm _t = *localtime(&_time);
 
               char dlname[64];
               strftime(dlname, sizeof(dlname), "attachment; filename=\"" FILE_DONWNLOAD_NAME "\"", &_t);
