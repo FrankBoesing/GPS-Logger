@@ -23,7 +23,7 @@ def build():
     if not SRC_DATA.exists():
         print(f"[WARN] Kein {SRC_DATA}-Verzeichnis gefunden.")
         return
-    hfile = DST_DATA / ".datahash"
+    hfile = DST_DATA / "../.datahash"
     old = hfile.read_text() if hfile.exists() else ""
     new = hash_dir(SRC_DATA)
     if old == new:
