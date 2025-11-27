@@ -43,8 +43,6 @@ static bool endsWith(const char *str, const char *suffix)
 
 bool str_to_ll(const char *str, long long *out)
 {
-  constexpr const long long LL_MAX_VAL = LONG_LONG_MAX;
-  constexpr const long long LL_MIN_VAL = LONG_LONG_MIN;
 
   while (isspace((unsigned char)*str))
     str++;

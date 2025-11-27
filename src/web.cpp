@@ -166,7 +166,6 @@ void setupWebServer()
                 char buf[NUM_BUF][CHUNK_SIZE];
               };
 
-              //DContext *ctx = new DContext{std::move(f), false, false, 0, {{0}, {0}}, {{0}, {0}}};
               DContext *ctx = new DContext{std::move(f), header,  0, {{0}, {0}}, {{0}, {0}}};
 
               // --- Buffer-Füllfunktion ---
@@ -287,14 +286,15 @@ void setupWebServer()
               if (isBadRequest(request, _argFile))
                 return;
 
-              const char *path = request->getParam(_argFile)->value().c_str();
+              String pathParam = FILE_PREFIX + request->getParam(_argFile)->value();
+              const char *path = pathParam.c_str();
 
               if (currentFile && strcmp(currentFile.name(), path) == 0)
               {
                 request->send(409, "text/plain", "File is currently being written to");
                 return;
               }
-              request->send(LittleFS, request->getParam(_argFile)->value().c_str(), "application/octet-stream", true); // download=true
+              request->send(LittleFS, path , "application/octet-stream", true);
             });
 
   /**********************/
