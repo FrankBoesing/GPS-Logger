@@ -109,6 +109,7 @@ static int deleteAllFiles(const char *fileext)
     const char *name = fnext.path();
     if ((fileext == NULL || endsWith(name, fileext)) && !logfile.isActive(name))
     {
+      fnext.close();
       if (LittleFS.remove(name))
       {
         count++;
@@ -119,10 +120,9 @@ static int deleteAllFiles(const char *fileext)
         log_w("Konnte %s nicht löschen", name);
       }
     }
-    fnext.close();
     fnext = root.openNextFile();
   }
-
+  fnext.close();
   root.close();
   xSemaphoreGive(semFile);
   return count;

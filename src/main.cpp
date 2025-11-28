@@ -147,7 +147,7 @@ static void loadPrefs()
   preferences.end();
 }
 
-void savePrefs()
+void savePrefs(eLogMode logMode)
 {
   Preferences preferences;
   preferences.begin("gps", false);
