@@ -165,8 +165,7 @@ void setupWebServer()
               enum states {header, points, footer, done};
 
               struct DContext {
-                //File f;
-                cFileRead f;
+                logfileR f;
                 states state;
                 uint bufIdx;
                 size_t len[NUM_BUF];
