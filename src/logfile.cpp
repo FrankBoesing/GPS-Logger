@@ -59,7 +59,6 @@ void cFileWrite::open()
     pointsWritten = pointsInFileCache = 0;
     xSemaphoreTake(semFile, portMAX_DELAY);
     f = LittleFS.open(filename, append ? FILE_APPEND : FILE_WRITE);
-
     // f.setBufferSize(sizeof(writeCache)); // Sichergehen, dass die Punkte in den File-Cache passen
     xSemaphoreGive(semFile);
     log_i("Logfile: %s", filename);
@@ -165,8 +164,9 @@ int32_t cCompression::zigzagDecode(uint32_t v)
     return (int32_t)((v >> 1) ^ (-(int32_t)(v & 1)));
 }
 
-constexpr const double SCALE = 1e6; // 1e5 -> ~1.11 m resolution
-constexpr const size_t SZ32 = sizeof(int32_t);
+static constexpr const double SCALE = 1e6; // 1e5 -> ~1.11 m resolution
+static constexpr const size_t SZ32 = sizeof(int32_t);
+static constexpr const uint8_t ESCAPE[3] = {0x7f, 0x7f, 0x7f};
 
 // Flush all Points
 void cPackedFileWrite::flush()
@@ -177,9 +177,8 @@ void cPackedFileWrite::flush()
 
     if (append)
     { // Es wird an eine vorhandene Datei angefügt. Escape schreiben.
-        f.write(0);
-        f.write(0);
-        f.write(0);
+        f.write(ESCAPE, 3);
+        log_d("Escape geschrieben");
     }
 
     if (pointsWritten == 0)
@@ -219,7 +218,7 @@ void cPackedFileWrite::flush()
     }
 
     f.flush();
-    log_w("Points written: %d", pointsWritten);
+    log_d("Points written: %d", pointsWritten);
 }
 
 bool cPackedFileRead::readAbsolute(GPSPoint *p)
@@ -264,8 +263,9 @@ bool cPackedFileRead::readPoint(GPSPoint *p)
     if (!readVarUint(f, vLon))
         return false;
 
-    if (vT == 0 && vLat == 0 && vLon == 0)
-    { // Escape gefunden. Absoluten Datensatz lesen.
+    if (vT == ESCAPE[0] && vLat == ESCAPE[1] && vLon == ESCAPE[2])
+    { // Absoluten Datensatz lesen.
+        log_d("Escape gefunden");
         pointsRead++;
         return readAbsolute(p);
     }

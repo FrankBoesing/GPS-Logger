@@ -42,6 +42,7 @@ public:
     const char *name() { return f.name(); }
     const char *path() { return f.path(); }
     int available() { return f.available(); };
+    size_t position() {return f.position();}
     operator bool() const { return f; }
 };
 

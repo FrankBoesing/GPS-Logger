@@ -199,6 +199,7 @@ void setupWebServer()
                             constexpr size_t lineLength = 80;
 
                             while (pos < bufSize - lineLength && ctx->f.available()) {
+                             // size_t position = ctx->f.position();
                               GPSPoint point;
                               if (!ctx->f.readPoint(&point)) break;
 
