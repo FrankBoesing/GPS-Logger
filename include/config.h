@@ -42,11 +42,9 @@
 
 // ---------- System ----------
 #define SERIAL_BAUD 115200
+#define COMPRESSION_ZIGZAG_VARINT false
 
 /*****************************************************************************************************/
-extern File currentFile;
-extern SemaphoreHandle_t semFile;
-extern const size_t& fsTotalBytes;
 
 enum eLogMode : uint8_t
 {
@@ -64,15 +62,6 @@ enum eLogCmd: uint8_t
 
 extern volatile eLogMode logMode;
 extern volatile eLogCmd logCmd;
-
-#define TIMEOFFSET 1761955200LL
-typedef uint32_t time32_t;
-struct GPSPoint
-{
-  float lat;
-  float lon;
-  time32_t time; // Zeit in 32 Bit speichern (von time_t wird TIMEOFFSET abgezogen)
-};
 
 #endif
 
