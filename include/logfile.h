@@ -90,9 +90,11 @@ public:
 
 class cPackedFileWrite : public cCompression, public cFileWrite
 {
-protected:
+private:
     int32_t lastLat, lastLon;
     uint32_t lastT;
+
+protected:
     void flush() override;
 
 public:
@@ -101,9 +103,10 @@ public:
 
 class cPackedFileRead : public cCompression, public cFileRead
 {
-protected:
+private:
     int32_t lastLat, lastLon;
     uint32_t lastT;
+    bool readAbsolute(GPSPoint *p);
 
 public:
     using cFileRead::cFileRead;

@@ -59,7 +59,8 @@ void cFileWrite::open()
     pointsWritten = pointsInFileCache = 0;
     xSemaphoreTake(semFile, portMAX_DELAY);
     f = LittleFS.open(filename, append ? FILE_APPEND : FILE_WRITE);
-    f.setBufferSize(sizeof(writeCache)); // Sichergehen, dass die Punkte in den File-Cache passen
+
+    // f.setBufferSize(sizeof(writeCache)); // Sichergehen, dass die Punkte in den File-Cache passen
     xSemaphoreGive(semFile);
     log_i("Logfile: %s", filename);
 }
@@ -172,15 +173,24 @@ void cPackedFileWrite::flush()
 {
 
     int p = 0;
+    bool append = pointsWritten == 0 && f.size() > 0;
+
+    if (append)
+    { // Es wird an eine vorhandene Datei angefügt. Escape schreiben.
+        f.write(0);
+        f.write(0);
+        f.write(0);
+    }
+
     if (pointsWritten == 0)
     { // 1. Punkt - unkomprimiert:
         lastLat = (int32_t)llround(writeCache[0].lat * SCALE);
         lastLon = (int32_t)llround(writeCache[0].lon * SCALE);
         lastT = writeCache[0].time;
 
+        f.write((const uint8_t *)&lastT, SZ32);
         f.write((const uint8_t *)&lastLat, SZ32);
         f.write((const uint8_t *)&lastLon, SZ32);
-        f.write((const uint8_t *)&lastT, SZ32);
 
         pointsWritten = 1;
         p = 1;
@@ -201,14 +211,36 @@ void cPackedFileWrite::flush()
         lastLon = lonSi;
         lastT = ti;
 
+        writeVarUint(f, dT);
         writeVarUint(f, zigzagEncode(dLat));
         writeVarUint(f, zigzagEncode(dLon));
-        writeVarUint(f, dT);
+
         pointsWritten++;
     }
 
     f.flush();
     log_w("Points written: %d", pointsWritten);
+}
+
+bool cPackedFileRead::readAbsolute(GPSPoint *p)
+{
+    uint32_t latS_u, lonS_u, t_u;
+
+    if (!f.read((uint8_t *)&t_u, SZ32))
+        return false;
+    if (!f.read((uint8_t *)&latS_u, SZ32))
+        return false;
+    if (!f.read((uint8_t *)&lonS_u, SZ32))
+        return false;
+
+    lastLat = (int32_t)latS_u;
+    lastLon = (int32_t)lonS_u;
+    lastT = t_u;
+
+    p->lat = ((double)lastLat) / SCALE;
+    p->lon = ((double)lastLon) / SCALE;
+    p->time = lastT;
+    return true;
 }
 
 bool cPackedFileRead::readPoint(GPSPoint *p)
@@ -218,44 +250,33 @@ bool cPackedFileRead::readPoint(GPSPoint *p)
 
     if (pointsRead == 0)
     {
-        uint32_t latS_u, lonS_u, t_u;
-
-        if (!f.read((uint8_t *)&latS_u, SZ32))
-            return false;
-        if (!f.read((uint8_t *)&lonS_u, SZ32))
-            return false;
-        if (!f.read((uint8_t *)&t_u, SZ32))
-            return false;
-
-        lastLat = (int32_t)latS_u;
-        lastLon = (int32_t)lonS_u;
-        lastT = t_u;
-
-        p->lat = ((double)lastLat) / SCALE;
-        p->lon = ((double)lastLon) / SCALE;
-        p->time = lastT;
-
         pointsRead = 1;
-        return true;
+        return readAbsolute(p);
     }
 
     // Deltas
-    uint32_t vLat, vLon, vT;
 
+    uint32_t vLat, vLon, vT;
+    if (!readVarUint(f, vT))
+        return false;
     if (!readVarUint(f, vLat))
         return false;
     if (!readVarUint(f, vLon))
         return false;
-    if (!readVarUint(f, vT))
-        return false;
 
+    if (vT == 0 && vLat == 0 && vLon == 0)
+    { // Escape gefunden. Absoluten Datensatz lesen.
+        pointsRead++;
+        return readAbsolute(p);
+    }
+
+    uint32_t dT = vT;
     int32_t dLat = zigzagDecode(vLat);
     int32_t dLon = zigzagDecode(vLon);
-    uint32_t dT = vT;
 
+    lastT += dT;
     lastLat += dLat;
     lastLon += dLon;
-    lastT += dT;
 
     p->lat = ((double)lastLat) / SCALE;
     p->lon = ((double)lastLon) / SCALE;
