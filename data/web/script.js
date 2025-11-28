@@ -47,8 +47,6 @@ const fmtHM = (s) =>
     ((s % 3600) / 60) | 0
   ).padStart(2, "0")}`;
 
-const sortFunction = (a, b) => a.name.localeCompare(b.name);
-
 async function loadFiles() {
   const res = await fetch(url + "/files");
   const d = await res.json();
@@ -61,20 +59,20 @@ async function loadFiles() {
     return;
   }
 
-  const szp = d["sizePoint"];
-
-  d.files.sort(sortFunction);
+  d.files.sort((a, b) => (a.path > b.path) - (a.path < b.path));
   d.files.forEach((file) => {
     const tr = document.createElement("tr");
-    const t = fmtHM(file["len"] / szp);
-    const name = file["name"];
-    const dispname = fmtTime(parseInt(name));
+    const path = file["path"];
+    const name = path.replace(/^.*[\\/]/, "").replace(/\.[^.]+$/, "");
+    const firstp = parseInt(name);
+    const t = fmtHM(file["lastpt"] - firstp);
+    const dname = fmtTime(firstp);
     if (file["active"]) {
-      tr.innerHTML = `<td>${dispname}</td><td>${t}</td><td></td>`;
+      tr.innerHTML = `<td>${dname}</td><td>${t}</td><td></td>`;
     } else {
       tr.innerHTML = `
-      <td>⬇️ <a class="download" href="${url}/download?file=${name}">${dispname}</a></td>
-      <td>${t}</td><td><button onclick="deleteFile('${name}')">🗑️</button></td>`;
+      <td>⬇️ <a class="download" href="${url}/download?file=${path}">${dname}</a></td>
+      <td>${t}</td><td><button onclick="deleteFile('${path}')">🗑️</button></td>`;
     }
     tbody.appendChild(tr);
   });

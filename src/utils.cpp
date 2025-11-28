@@ -1,10 +1,7 @@
 #include "utils.h"
 
-SemaphoreHandle_t jsonMutex;
-
 /****************************************************************************************************************************/
 /****************************************************************************************************************************/
-
 // ESP32 hat kein timegm implementiert. Reparatur:
 
 static long _offset_seconds = 0;
@@ -27,9 +24,7 @@ void initTimeOffset() // setzt voraus, dass die lokale Zeitzone schon gesetzt wu
   _offset_seconds = local_epoch - utc_epoch;
   log_v("TZ Offset: %d", offset_seconds);
 }
-
 /****************************************************************************************************************************/
-
 static bool endsWith(const char *str, const char *suffix)
 {
   if (!str || !suffix)
@@ -40,10 +35,9 @@ static bool endsWith(const char *str, const char *suffix)
     return false;
   return strncmp(str + lenstr - lensuffix, suffix, lensuffix) == 0;
 }
-
+/****************************************************************************************************************************/
 bool str_to_ll(const char *str, long long *out)
 {
-
   while (isspace((unsigned char)*str))
     str++;
 
@@ -74,30 +68,29 @@ bool str_to_ll(const char *str, long long *out)
   return true;
 }
 /****************************************************************************************************************************/
-// Refresh the file list and write as JSON to FILELIST_PATH
+// Refresh the file list
 void readFileList(JsonObject &fileList, const char *fileext)
 {
   xSemaphoreTake(semFile, portMAX_DELAY);
 
   fileList.clear();
-  fileList["sizePoint"] = sizeof(GPSPoint);
-
   JsonArray arr = fileList["files"].to<JsonArray>();
 
   File root = LittleFS.open("/");
-  File f = root.openNextFile();
-  while (f)
+  File fnext = root.openNextFile();
+  while (fnext)
   {
-    if (f.size() > 0 && endsWith(f.name(), fileext))
+    size_t sz = fnext.size();
+    const char *name = fnext.path();
+    if (sz > 0 && endsWith(name, fileext))
     {
       JsonObject obj = arr.add<JsonObject>();
-      obj["name"] = f.name();
-      obj["len"] = f.size();
-      // obj["lastWrite"] = f.getLastWrite();
-      obj["active"] = (currentFile && strcmp(currentFile.name(), f.name()) == 0);
+      obj["path"] = name;
+      obj["active"] = logfile.isActive(name);
+      obj["lastpt"] = fnext.getLastWrite();
     }
-    f.close();
-    f = root.openNextFile();
+    fnext.close();
+    fnext = root.openNextFile();
   }
   root.close();
 
@@ -113,18 +106,20 @@ static int deleteAllFiles(const char *fileext)
 
   while (fnext)
   {
-    if (endsWith(fnext.name(), fileext) && !(currentFile && strcmp(currentFile.name(), fnext.name()) == 0))
+    const char *name = fnext.path();
+    if ((fileext == NULL || endsWith(name, fileext)) && !logfile.isActive(name))
     {
-      if (LittleFS.remove(fnext.name()))
+      if (LittleFS.remove(name))
       {
         count++;
-        log_i("Lösche: %s", fnext.name());
+        log_i("Gelöscht: %s", name);
       }
       else
       {
-        log_w("Konnte %s nicht löschen", fnext.name());
+        log_w("Konnte %s nicht löschen", name);
       }
     }
+    fnext.close();
     fnext = root.openNextFile();
   }
 
@@ -135,9 +130,12 @@ static int deleteAllFiles(const char *fileext)
 
 static int deleteFile(const char *filename)
 {
+  if (!filename)
+    return 0;
+
   int count = 0;
   xSemaphoreTake(semFile, portMAX_DELAY);
-  if (LittleFS.exists(filename) && !(currentFile && strcmp(currentFile.name(), filename) == 0))
+  if (LittleFS.exists(filename) && !logfile.isActive(filename))
   {
     log_i("Lösche: %s", filename);
     if (LittleFS.remove(filename))
@@ -161,39 +159,46 @@ int deleteFiles(const char *filename)
   return deleteFile(filename);
 }
 
-// Sucht die älteste(newest = false) oder neueste (true) Datei. Achtung gibt evtl currentFile zurück.
-String findFile(const bool newest, const char *fileext)
+// Sucht die älteste(newest = false) oder neueste (true) Datei.
+bool findFile(const bool newest, char *filename, const size_t maxlen, time_t *lastWrite, const char *fileext)
 {
-  String bestName;
-  bestName.reserve(32);
+  if (!filename || maxlen < 2 || !lastWrite)
+    return false;
 
-  time_t bestTime = newest ? LONG_MIN : LONG_MAX;
+  bool found = false;
+  time_t bestTime = newest ? (time_t)LONG_MIN : (time_t)LONG_MAX;
 
   xSemaphoreTake(semFile, portMAX_DELAY);
-
   File root = LittleFS.open("/");
-  File fnext = root.openNextFile();
-
-  while (fnext)
+  File f = root.openNextFile();
+  while (f)
   {
-    if (endsWith(fnext.name(), fileext))
+    const char *name = f.path();
+    if (fileext == NULL || endsWith(name, fileext))
     {
-      time_t written = fnext.getLastWrite();
+      time_t written = f.getLastWrite();
       if ((newest && written > bestTime) || (!newest && written < bestTime))
       {
         bestTime = written;
-        bestName = '/' + String(fnext.name());
+        strncpy(filename, name, maxlen - 1);
+        filename[maxlen - 1] = '\0';
+        found = true;
       }
     }
-    fnext = root.openNextFile();
+    f.close();
+    f = root.openNextFile();
   }
 
   root.close();
   xSemaphoreGive(semFile);
 
-  return bestName;
-}
+  if (found)
+    *lastWrite = bestTime;
+  else
+    filename[0] = '\0';
 
+  return found;
+}
 /****************************************************************************************************************************/
 
 // Prüfen ob GPS verbunden ist.

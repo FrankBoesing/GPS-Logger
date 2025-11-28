@@ -16,6 +16,8 @@ static constexpr const char _argFile[] = "file";
 static AsyncWebServer server(80);
 static AsyncCorsMiddleware cors;
 
+static SemaphoreHandle_t semDL; // Download
+
 /****************************************************************************************************************************/
 /****************************************************************************************************************************/
 
@@ -33,6 +35,8 @@ static bool isBadRequest(AsyncWebServerRequest *request, const char *arg)
 
 void setupWebServer()
 {
+  semDL = xSemaphoreCreateBinary();
+  xSemaphoreGive(semDL);
 
   // https://github.com/ESP32Async/ESPAsyncWebServer/blob/main/examples/Json/Json.ino
 
@@ -68,9 +72,9 @@ void setupWebServer()
 
               doc["totalBytes"] = fsTotalBytes;
               doc["usedBytes"] = LittleFS.usedBytes();
-              doc["sizePoint"] = sizeof(GPSPoint);
+              //doc["sizePoint"] = sizeof(GPSPoint);
 
-              doc["loggingActive"] = currentFile? true:false;
+              doc["loggingActive"] = (bool)logfile;
 
               multi_heap_info_t info;
               heap_caps_get_info(&info, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT); // internal RAM
@@ -141,32 +145,36 @@ void setupWebServer()
               String pathParam = FILE_PREFIX + request->getParam(_argFile)->value();
               const char *path = pathParam.c_str();
 
-              if (currentFile && strcmp(currentFile.name(), path) == 0) {
+              if (logfile.isActive(path)) {
                 request->send(409, "text/plain", "File is currently being written to");
                 return;
               }
 
-              File f = LittleFS.open(path, FILE_READ);
-              if (!f) {
+              if (!LittleFS.exists(path))
+              {
                 request->send(404, "text/plain", "File not found");
                 return;
               }
 
+              xSemaphoreTake(semDL, portMAX_DELAY);
               esp_wifi_set_ps(WIFI_PS_NONE);
+
               //constexpr size_t CHUNK_SIZE = TCP_MSS; // 1436
               constexpr size_t CHUNK_SIZE = 1460;
               constexpr uint NUM_BUF = 2;
               enum states {header, points, footer, done};
 
               struct DContext {
-                File f;
+                //File f;
+                cFileRead f;
                 states state;
                 uint bufIdx;
                 size_t len[NUM_BUF];
                 char buf[NUM_BUF][CHUNK_SIZE];
               };
 
-              DContext *ctx = new DContext{std::move(f), header,  0, {{0}, {0}}, {{0}, {0}}};
+              DContext *ctx = new DContext{path, header,  0, {{0}, {0}}, {{0}, {0}}};
+              //DContext *ctx = new DContext{std::move(f), header,  0, {{0}, {0}}, {{0}, {0}}};
 
               // --- Buffer-Füllfunktion ---
               auto fillBuffer = [ctx](char *buf, size_t bufSize) -> size_t {
@@ -175,7 +183,7 @@ void setupWebServer()
                 constexpr size_t tmpSize = sizeof(tmp);
                 size_t pos = 0;
 
-                //Statusmaschine für die Abfolge header(1)->trackpoints(2)->footer(3)->Ende(-1)
+                //Statusmaschine für die Abfolge header->trackpoints->footer->done
                 switch (ctx->state)
                 {
                   case header: {
@@ -193,14 +201,13 @@ void setupWebServer()
 
                             while (pos < bufSize - lineLength && ctx->f.available()) {
                               GPSPoint point;
-                              int len = ctx->f.readBytes((char *)&point, sizeof(GPSPoint));
-                              if (len < sizeof(GPSPoint)) break;
+                              if (!ctx->f.readPoint(&point)) break;
 
                               struct tm *tm;
                               time_t  ptime = (time_t)TIMEOFFSET + (time_t)point.time;
                               tm = gmtime(&ptime);
 
-                              len = snprintf(tmp, tmpSize, "<trkpt lat=\"%.6f\" lon=\"%.6f\">",point.lat, point.lon);
+                              int len = snprintf(tmp, tmpSize, "<trkpt lat=\"%.6f\" lon=\"%.6f\">",point.lat, point.lon);
                               len += strftime(tmp + len, tmpSize - len, "<time>%FT%TZ</time></trkpt>\n", tm);
                               if (pos + len >= bufSize) break;
 
@@ -223,6 +230,7 @@ void setupWebServer()
                           }
 
                   case done: {}
+
                 } // switch
 
                 return pos;
@@ -239,7 +247,6 @@ void setupWebServer()
                 size_t activeLen = ctx->len[ctx->bufIdx];
 
                 if (activeLen == 0 && ctx->state == done) {
-                  ctx->f.close();
                   delete ctx;
                   return 0;
                 }
@@ -265,10 +272,8 @@ void setupWebServer()
               AsyncWebServerResponse *response =
                   request->beginChunkedResponse("application/gpx+xml", generator);
 
-
               //Lesbaren Dateinamen erzeugen:
               time_t _time;
-              // sscanf(path, FILE_PREFIX "%lld", &_time); // +1 um führenden Slash zu überspringen
               str_to_ll(path + strlen(FILE_PREFIX), &_time); //FILE_PREFIX überspringen
               struct tm _t = *localtime(&_time);
 
@@ -277,7 +282,8 @@ void setupWebServer()
 
               response->addHeader("Content-Disposition", dlname);
               request->send(response);
-              esp_wifi_set_ps(WiFi_POWER_MODE); });
+              esp_wifi_set_ps(WiFi_POWER_MODE);
+              xSemaphoreGive(semDL); });
 
   /**********************/
 
@@ -289,13 +295,12 @@ void setupWebServer()
               String pathParam = FILE_PREFIX + request->getParam(_argFile)->value();
               const char *path = pathParam.c_str();
 
-              if (currentFile && strcmp(currentFile.name(), path) == 0)
+              if (logfile.isActive(path))
               {
                 request->send(409, "text/plain", "File is currently being written to");
                 return;
               }
-              request->send(LittleFS, path , "application/octet-stream", true);
-            });
+              request->send(LittleFS, path , "application/octet-stream", true); });
 
   /**********************/
   // Static files

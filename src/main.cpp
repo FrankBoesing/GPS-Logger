@@ -6,17 +6,14 @@
 #include <time.h>
 #include "config.h"
 #include "utils.h"
-#include "debug.h"
+//#include "debug.h"
 #include "gps_hw.h"
 #include "web.h"
 #include "credentials.h"
 
 // TODO: Status im Webinterface erweitern. Flash Belegung. Build-Datum.
 // IDEE: WLAN abschalten wenn in Bewegung? Nach x Minuten?  WiFi.disconnect(true); WiFi.mode(WIFI_OFF); -> Km/h Anzeige nicht möglich.
-// IDEE: Datenkomprimierung(?) -> keine Anzeige der Dateigröße möglich... statdessen prozentual bzw kb?
 
-File currentFile;
-SemaphoreHandle_t semFile;
 volatile eLogMode logMode = NoLog;
 volatile eLogCmd logCmd = nope;
 char gpsFixQuality = '0'; // Invalid = '0', GPS = '1', DGPS = '2', PPS = '3', RTK = '4', FloatRTK = '5', Estimated = '6', Manual = '7', Simulated = '8'
@@ -24,99 +21,10 @@ char gpsFixQuality = '0'; // Invalid = '0', GPS = '1', DGPS = '2', PPS = '3', RT
 TinyGPSPlus gps;
 unsigned long lastGPSTimeSync = 0;
 
-static size_t _fsTotalBytes;
-const size_t &fsTotalBytes = _fsTotalBytes; // make it read-only
-
 /****************************************************************************************************************************/
 /****************************************************************************************************************************/
 /****************************************************************************************************************************/
 
-static size_t pointsInFileCache = 0;
-
-static void closeLogFile()
-{
-  if (currentFile)
-  {
-    xSemaphoreTake(semFile, portMAX_DELAY);
-    currentFile.flush();
-    currentFile.close();
-    xSemaphoreGive(semFile);
-    log_i("Datei geschlossen");
-  }
-
-  pointsInFileCache = 0;
-}
-
-static void openLogFile()
-{
-  if (currentFile)
-    return;
-
-  // Falls in LogMode eingeschaltet, prüfen ob an die jüngste Datei angehängt werden soll:
-  if (RESTART_AFTER_IDLE) // An letztes Logfile anfügen?
-  {
-    time_t now;
-    time(&now);
-
-    String fname = findFile(true);
-    xSemaphoreTake(semFile, portMAX_DELAY);
-    File f = LittleFS.open(fname, FILE_READ);
-    time_t lastWritten = f.getLastWrite();
-    f.close();
-
-    if (now - lastWritten <= MAX_IDLE_SECONDS)
-    {
-      currentFile = LittleFS.open(fname, FILE_APPEND);
-      log_i("Füge an Logfile an: %s Alter: %us", fname.c_str(), now - lastWritten);
-    }
-    xSemaphoreGive(semFile);
-  }
-
-  if (!currentFile)
-  {
-    char filename[32];
-    time_t now;
-    time(&now);
-
-    // use time as filename:
-    snprintf(filename, sizeof(filename), FILE_PREFIX "%lld" FILE_SUFFIX, now);
-
-    xSemaphoreTake(semFile, portMAX_DELAY);
-    currentFile = LittleFS.open(filename, FILE_WRITE);
-    log_i("Neues Logfile: %s", filename);
-    xSemaphoreGive(semFile);
-  }
-
-  if (currentFile)
-  {
-    xSemaphoreTake(semFile, portMAX_DELAY);
-    currentFile.setBufferSize(sizeof(GPSPoint) * FILECACHE_MAXPOINTS); // Sichergehen, dass die Punkte in den File-Cache passen
-    xSemaphoreGive(semFile);
-  }
-  pointsInFileCache = 0;
-}
-
-static void logPoint(GPSPoint *p)
-{
-  if (currentFile)
-  {
-    xSemaphoreTake(semFile, portMAX_DELAY);
-    currentFile.write((const uint8_t *)p, sizeof(GPSPoint));
-    pointsInFileCache++;
-    if (pointsInFileCache >= FILECACHE_MAXPOINTS)
-    {
-      currentFile.flush();
-      //      vTaskDelay(100 / portTICK_PERIOD_MS);
-      pointsInFileCache = 0;
-      log_d("Cache flushed");
-    }
-    xSemaphoreGive(semFile);
-  }
-  else
-    log_e("Kann nicht loggen. Logfile geschlossen");
-}
-
-/****************************************************************************************************************************/
 /****************************************************************************************************************************/
 
 static GPSPoint setGPSPoint()
@@ -134,8 +42,8 @@ static GPSPoint setGPSPoint()
   utc = timegm(&t);
 
   GPSPoint p = {
-      .lat = (float)gps.location.lat(),
-      .lon = (float)gps.location.lng(),
+      .lat = (gpsfloat_t)gps.location.lat(),
+      .lon = (gpsfloat_t)gps.location.lng(),
       .time = (time32_t)(utc - TIMEOFFSET)};
 
   return p;
@@ -178,7 +86,8 @@ static void saveToGPSLog()
   // Möglicherweise wurde durch die Web-ui das Loggen abgeschaltet:
   if (logCmd == stopNow)
   {
-    closeLogFile();
+    //closeLogFile();
+    logfile.close();
     logCmd = nope;
     return;
   }
@@ -186,9 +95,10 @@ static void saveToGPSLog()
   if (!lastGPSTimeSync)
     return; // GPS Zeit wurde noch nicht gesetzt
 
-  if (!currentFile && logCmd == startNow)
+  if (!logfile && logCmd == startNow)
   {
-    openLogFile();
+    //openLogFile();
+    logfile.open();
     logCmd = nope;
     return;
   }
@@ -210,18 +120,20 @@ static void saveToGPSLog()
 
   speed = gps.speed.isValid() ? gps.speed.kmph() : 0.0f;
 
-  if (!currentFile && (logMode == LogAfterBoot ||
+  if (!logfile && (logMode == LogAfterBoot ||
                        (logMode == LogAfterMinSpeed && gps.speed.isValid() && speed >= MIN_SPEED_TO_START)))
   {
-    openLogFile();
+    //openLogFile();
+    logfile.open();
     logCmd = nope;
     return;
   }
 
-  if (currentFile)
+  if (logfile)
   {
     GPSPoint p = setGPSPoint();
-    logPoint(&p);
+    logfile.writePoint(&p);
+    //logPoint(&p);
   }
 }
 
@@ -284,17 +196,10 @@ void setup()
   LEDON();
 
   loadPrefs();
-
-  semFile = xSemaphoreCreateBinary();
-  xSemaphoreGive(semFile);
-
-  if (!LittleFS.begin(false))
-    error("LittleFS Fehler!");
+  initGPSfile();
 
   if (!LittleFS.exists("/web/index.html"))
     error("LittleFS: WEBUI nicht vorhanden");
-
-  _fsTotalBytes = LittleFS.totalBytes();
 
   setenv("TZ", TIMEZONE, 1);
   tzset();
