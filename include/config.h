@@ -42,7 +42,7 @@
 
 // ---------- System ----------
 #define SERIAL_BAUD 115200
-#define COMPRESSION_ZIGZAG_VARINT false
+#define COMPRESSION_ZIGZAG_VARINT true
 
 /*****************************************************************************************************/
 

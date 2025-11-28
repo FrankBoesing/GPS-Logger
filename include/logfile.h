@@ -39,43 +39,85 @@ protected:
 
 public:
     ~cFile() { close(f); }
-    inline const char *name() { return f.name(); }
-    inline const char *path() { return f.path(); }
-    inline operator bool() const { return f; }
+    const char *name() { return f.name(); }
+    const char *path() { return f.path(); }
+    int available() { return f.available(); };
+    operator bool() const { return f; }
 };
 
 class cFileWrite : public cFile
 {
-private:
+protected:
     GPSPoint writeCache[FILECACHE_MAXPOINTS];
     size_t pointsInFileCache = 0;
-    size_t points = 0;
+    size_t pointsWritten = 0;
+
+    virtual void flush();
 
 public:
+    using cFile::cFile;
     void open();
     void writePoint(const GPSPoint *p);
     void close();
-    inline bool isActive(const char *path) { return (f && strcmp(f.path(), path) == 0); }
-    inline size_t getPoints() { return points; }
+    bool isActive(const char *path) { return (f && strcmp(f.path(), path) == 0); }
+    size_t getPoints() { return pointsWritten; }
 };
 
 class cFileRead : public cFile
 {
+protected:
+    size_t pointsRead;
+
 public:
-    cFileRead(const char *filename) { f = LittleFS.open(filename, FILE_READ); };
-    inline int available() { return f.available(); };
-    bool readPoint(const GPSPoint *p);
+    using cFile::cFile;
+    cFileRead(const char *filename)
+    {
+        f = LittleFS.open(filename, FILE_READ);
+        pointsRead = 0;
+    };
+    bool readPoint(GPSPoint *p);
+    size_t getPoints() { return pointsRead; }
 };
 
-#if 0
-class cCompressedFileRead : cFileRead
+class cCompression
 {
-    // int available();
-    // bool readPoint(const GPSPoint *p);
-
-    -....
+public:
+    void writeVarUint(File &f, uint32_t v);
+    bool readVarUint(File &f, uint32_t &out);
+    uint32_t zigzagEncode(int32_t x);
+    int32_t zigzagDecode(uint32_t v);
 };
+
+class cPackedFileWrite : public cCompression, public cFileWrite
+{
+protected:
+    int32_t lastLat, lastLon;
+    uint32_t lastT;
+    void flush() override;
+
+public:
+    using cFileWrite::cFileWrite;
+};
+
+class cPackedFileRead : public cCompression, public cFileRead
+{
+protected:
+    int32_t lastLat, lastLon;
+    uint32_t lastT;
+
+public:
+    using cFileRead::cFileRead;
+    bool readPoint(GPSPoint *p);
+};
+
+#if COMPRESSION_ZIGZAG_VARINT
+typedef cPackedFileWrite logfileW;
+typedef cPackedFileRead logfileR;
+#else
+typedef cFileWrite logfileW;
+typedef cFileRead logfileR;
 #endif
 
-extern cFileWrite logfile;
+extern logfileW logfile;
+
 #endif
