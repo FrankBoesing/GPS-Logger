@@ -7,7 +7,7 @@
 #include "debug.h"
 
 extern char gpsFixQuality;
-void savePrefs(eLogMode);
+void savePrefs();
 
 
 static constexpr const char gpxheader[] = "<?xml version=\"1.0\" encoding=\"ISO-8859-1\" standalone=\"no\"?>\n<gpx version=\"1.1\" creator=\"gpx Logger\">\n<trk><trkseg>\n";
@@ -95,9 +95,8 @@ void setupWebServer()
 
               eLogMode mode = (eLogMode)request->getParam("logMode")->value().toInt();
               if (mode <= LogAfterMinSpeed) {
-                savePrefs(mode);
-                //Bei LogAfterBoot würde das Log sofort starten. Das wollen wir nicht.
-                if (mode != LogAfterBoot) logMode = mode;
+                logMode = mode;
+                savePrefs();
               }
               else request->send(400, "texte/plain", "Error");
               request->send(200, "texte/plain", "OK"); });

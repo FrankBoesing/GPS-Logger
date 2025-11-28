@@ -6,7 +6,7 @@
 #include <time.h>
 #include "config.h"
 #include "utils.h"
-//#include "debug.h"
+// #include "debug.h"
 #include "gps_hw.h"
 #include "web.h"
 #include "credentials.h"
@@ -86,7 +86,7 @@ static void saveToGPSLog()
   // Möglicherweise wurde durch die Web-ui das Loggen abgeschaltet:
   if (logCmd == stopNow)
   {
-    //closeLogFile();
+    // closeLogFile();
     logfile.close();
     logCmd = nope;
     return;
@@ -97,7 +97,7 @@ static void saveToGPSLog()
 
   if (!logfile && logCmd == startNow)
   {
-    //openLogFile();
+    // openLogFile();
     logfile.open();
     logCmd = nope;
     return;
@@ -120,10 +120,9 @@ static void saveToGPSLog()
 
   speed = gps.speed.isValid() ? gps.speed.kmph() : 0.0f;
 
-  if (!logfile && (logMode == LogAfterBoot ||
-                       (logMode == LogAfterMinSpeed && gps.speed.isValid() && speed >= MIN_SPEED_TO_START)))
+  if (!logfile && ((logMode == LogAfterMinSpeed && gps.speed.isValid() && speed >= MIN_SPEED_TO_START)))
   {
-    //openLogFile();
+    // openLogFile();
     logfile.open();
     logCmd = nope;
     return;
@@ -133,7 +132,7 @@ static void saveToGPSLog()
   {
     GPSPoint p = setGPSPoint();
     logfile.writePoint(&p);
-    //logPoint(&p);
+    // logPoint(&p);
   }
 }
 
@@ -147,7 +146,7 @@ static void loadPrefs()
   preferences.end();
 }
 
-void savePrefs(eLogMode logMode)
+void savePrefs()
 {
   Preferences preferences;
   preferences.begin("gps", false);
@@ -225,6 +224,8 @@ void setup()
 
   hwinit();
 
+  if (logMode == LogAfterBoot)
+    logCmd = startNow;
   log_i("Setup abgeschlossen.");
   LEDOFF();
 }
