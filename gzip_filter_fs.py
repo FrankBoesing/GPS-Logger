@@ -8,7 +8,7 @@ SRC_DATA = PROJECT_DIR / "data"
 DST_DATA = PROJECT_DIR / ".pio" / "data_gz_temp"
 
 COMPRESS = {".css", ".js", ".json", ".txt"}
-KEEP = {".html", ".jpg", ".jpeg", ".png", ".gif", ".ico", ".svg", ".bin", ".dat"}
+KEEP = {".html", ".jpg", ".jpeg", ".png", ".gif", ".ico", ".svg", ".bin", ".dat", ".vic"}
 
 def hash_dir(p: Path):
     h = hashlib.sha1()
