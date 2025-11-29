@@ -9,7 +9,7 @@
 extern char gpsFixQuality;
 void savePrefs();
 
-
+static constexpr const char *_fix[] = {"-", "GPS", "DGPS", "PPS", "RTK", "FloatRTK", "Estimated", "Manual", "Simulated"};
 static constexpr const char gpxheader[] = "<?xml version=\"1.0\" encoding=\"ISO-8859-1\" standalone=\"no\"?>\n<gpx version=\"1.1\" creator=\"gpx Logger\">\n<trk><trkseg>\n";
 static constexpr const char gpxfooter[] = "</trkseg></trk>\n</gpx>\n";
 static constexpr const char _argFile[] = "file";
@@ -39,8 +39,6 @@ void setupWebServer()
   semDL = xSemaphoreCreateBinary();
   xSemaphoreGive(semDL);
 
-  // https://github.com/ESP32Async/ESPAsyncWebServer/blob/main/examples/Json/Json.ino
-
   // List Files
   server.on("/files", HTTP_GET, [](AsyncWebServerRequest *request)
             {
@@ -59,14 +57,10 @@ void setupWebServer()
               AsyncJsonResponse *response = new AsyncJsonResponse();
               JsonObject doc = response->getRoot().to<JsonObject>();
 
-              char quality[2] = "";
-              quality[0] = gpsFixQuality;
-
               time_t now;
               time(&now);
               doc["time_t"]  = now;
-
-              doc["gpsQuality"] = quality;
+              doc["fix"] = _fix[gpsFixQuality - '0'];
               // doc["uptime"] = millis();
 
               doc["logMode"] = (int)logMode;
@@ -112,7 +106,7 @@ void setupWebServer()
 
                 logCmd = mode; // logCMD wird nun im Hauptprogramm ausgeführt.
 
-#if 1
+#if 0
                 LEDON();
                 do { // Kein Timeout nötig.. wenn was schief läuft, ist sowieso alles kaputt. So merkt der Anwender es wenigstens schnell.
                   vTaskDelay(20 / portTICK_PERIOD_MS);
@@ -129,8 +123,7 @@ void setupWebServer()
   server.on("/delete", HTTP_GET, [](AsyncWebServerRequest *request)
             {
               if (isBadRequest(request, _argFile)) return;
-              String arg = request->getParam(_argFile)->value();
-              deleteFiles( arg.c_str() );
+              deleteFiles( request->getParam(_argFile)->value().c_str() );
               request->send(200, "text/plain", "OK"); });
 
   /**********************/
@@ -142,9 +135,7 @@ void setupWebServer()
   server.on("/download", HTTP_GET, [](AsyncWebServerRequest *request)
             {
               if (isBadRequest(request, _argFile)) return;
-
-              String pathParam = FILE_PREFIX + request->getParam(_argFile)->value();
-              const char *path = pathParam.c_str();
+              const char *path = request->getParam(_argFile)->value().c_str();
 
               if (logfile.isActive(path)) {
                 request->send(409, "text/plain", "File is currently being written to");
@@ -174,7 +165,6 @@ void setupWebServer()
               };
 
               DContext *ctx = new DContext{path, header,  0, {{0}, {0}}, {{0}, {0}}};
-              //DContext *ctx = new DContext{std::move(f), header,  0, {{0}, {0}}, {{0}, {0}}};
 
               // --- Buffer-Füllfunktion ---
               auto fillBuffer = [ctx](char *buf, size_t bufSize) -> size_t {
@@ -228,9 +218,10 @@ void setupWebServer()
                               pos += flen;
                               ctx->state = done;
                             }
+                            break;
                           }
 
-                  case done: {}
+                  case done: break;
 
                 } // switch
 
@@ -290,11 +281,8 @@ void setupWebServer()
 
   server.on("/downloadraw", HTTP_GET, [](AsyncWebServerRequest *request)
             {
-              if (isBadRequest(request, _argFile))
-                return;
-
-              String pathParam = FILE_PREFIX + request->getParam(_argFile)->value();
-              const char *path = pathParam.c_str();
+              if (isBadRequest(request, _argFile)) return;
+              const char *path = request->getParam(_argFile)->value().c_str();
 
               if (logfile.isActive(path))
               {
@@ -305,14 +293,13 @@ void setupWebServer()
 
   /**********************/
   // Static files
-  // server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) { request->redirect("/index.html"); });
   server.serveStatic("/", LittleFS, "/web").setDefaultFile("index.html");
-  // server.onNotFound([](AsyncWebServerRequest *request){ request->send(404, _texthtml, _notFound); });
 
   if (CORE_DEBUG_LEVEL > ARDUHAL_LOG_LEVEL_WARN)
+  {
     cors.setAllowCredentials(false); // for debug only
-
-  server.addMiddleware(&cors);
+    server.addMiddleware(&cors);
+  }
 
   server.begin();
 }

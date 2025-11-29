@@ -15,8 +15,8 @@
 #define GPS_MODEL UBLOX
 #define GPSWAITFORINITIALDATA (5UL * 1000UL) // Wartezeit nach Start für Lebenszeichen vom GPS
 
+#define GPS_TIMESYNC_ONCE true                          // true: Nur einmal nach 1. Fix / false: In unten angegebem Intervall.
 #define GPS_TIMESYNC_INTERVAL_MS (15UL * 60UL * 1000UL) // Alle 15 Minuten Uhrzeit vom GPS neu setzen (Einheit Millisekunden)
-#define GPS_LOGINTERVAL 1UL                             // Logging alle 1 Sekunde
 #define DEFAULTLOGMODE NoLog                            // (s.u.)
 #define MIN_SPEED_TO_START 5.0f                         // Mindestgeschwindigkeit (KM/H) um loggen zu starten
 
@@ -31,7 +31,7 @@
 // ---------- Speicher ----------
 
 #define FILES_WEB_DIR "/web/"
-#define FILECACHE_MAXPOINTS 10
+#define FILECACHE_MAXPOINTS 5
 
 #define FILE_DONWNLOAD_NAME "%F_%H-%M.gpx" // Name der Downloads, stftime Format https://man7.org/linux/man-pages/man3/strftime.3.html
 //#define FILE_DELETE_OLDEST true  // Falls der Platz im Flash knapp wird, älteste Datei löschen //TODO: noch nicht implementiert

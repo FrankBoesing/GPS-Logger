@@ -74,7 +74,7 @@ void cFileWrite::close()
     f.close();
     xSemaphoreGive(semFile);
     pointsInFileCache = 0;
-    log_v("Datei geschlossen");
+    log_d("Datei geschlossen");
 }
 
 // Flush all Points
@@ -99,7 +99,7 @@ void cFileWrite::writePoint(const GPSPoint *p)
         {
             flush();
             pointsInFileCache = 0;
-            log_d("Cache flushed");
+            log_v("Cache flushed");
         }
     }
 }
@@ -191,7 +191,6 @@ void cPackedFileWrite::flush()
         f.write((const uint8_t *)&lastLat, SZ32);
         f.write((const uint8_t *)&lastLon, SZ32);
 
-        pointsWritten = 1;
         p = 1;
     }
 
@@ -204,7 +203,7 @@ void cPackedFileWrite::flush()
 
         int32_t dLat = latSi - lastLat;
         int32_t dLon = lonSi - lastLon;
-        uint32_t dT = (ti >= lastT) ? (ti - lastT) : 0; // falls Uhrenrücksetzung -> 0 (alternativ: abs or escape)
+        uint32_t dT = (ti >= lastT) ? (ti - lastT) : 0; // falls Uhrenrücksetzung
 
         lastLat = latSi;
         lastLon = lonSi;
@@ -214,10 +213,10 @@ void cPackedFileWrite::flush()
         writeVarUint(f, zigzagEncode(dLat));
         writeVarUint(f, zigzagEncode(dLon));
 
-        pointsWritten++;
     }
 
     f.flush();
+    pointsWritten += pointsInFileCache;
     log_d("Points written: %d", pointsWritten);
 }
 
@@ -225,10 +224,8 @@ bool cPackedFileRead::readAbsolute(GPSPoint *p)
 {
     uint32_t latS_u, lonS_u, t_u;
 
-    if (!f.read((uint8_t *)&t_u, SZ32))
-        return false;
-    if (!f.read((uint8_t *)&latS_u, SZ32))
-        return false;
+    f.read((uint8_t *)&t_u, SZ32);
+    f.read((uint8_t *)&latS_u, SZ32);
     if (!f.read((uint8_t *)&lonS_u, SZ32))
         return false;
 
@@ -236,22 +233,17 @@ bool cPackedFileRead::readAbsolute(GPSPoint *p)
     lastLon = (int32_t)lonS_u;
     lastT = t_u;
 
-    p->lat = ((double)lastLat) / SCALE;
-    p->lon = ((double)lastLon) / SCALE;
+    p->lat = ((double)lastLat) * (1.0 / SCALE);
+    p->lon = ((double)lastLon) * (1.0 / SCALE);
     p->time = lastT;
+    pointsRead++;
     return true;
 }
 
 bool cPackedFileRead::readPoint(GPSPoint *p)
 {
-    if (!f)
-        return false;
-
     if (pointsRead == 0)
-    {
-        pointsRead = 1;
         return readAbsolute(p);
-    }
 
     // Deltas
 
@@ -265,8 +257,7 @@ bool cPackedFileRead::readPoint(GPSPoint *p)
 
     if (vT == ESCAPE[0] && vLat == ESCAPE[1] && vLon == ESCAPE[2])
     { // Absoluten Datensatz lesen.
-        log_d("Escape gefunden");
-        pointsRead++;
+        //log_d("Escape gefunden"); //do not use if not needed.
         return readAbsolute(p);
     }
 
@@ -278,8 +269,8 @@ bool cPackedFileRead::readPoint(GPSPoint *p)
     lastLat += dLat;
     lastLon += dLon;
 
-    p->lat = ((double)lastLat) / SCALE;
-    p->lon = ((double)lastLon) / SCALE;
+    p->lat = ((double)lastLat) * (1.0 / SCALE);
+    p->lon = ((double)lastLon) * (1.0 / SCALE);
     p->time = lastT;
 
     pointsRead++;

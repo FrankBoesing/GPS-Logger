@@ -124,24 +124,14 @@ async function loadFooter(d) {
 }
 
 async function loadStatus() {
-  const fixstr = [
-    "-",
-    "GPS",
-    "DGPS",
-    "PPS",
-    "RTK",
-    "FloatRTK",
-    "Estimated",
-    "Manual",
-    "Simulated",
-  ];
+
   const r = await fetch(url + "/info");
   const d = await r.json();
   const sec = document.getElementById("statusInfo");
   if (!sec) return;
   const rows = [];
   const add = (k, v) => rows.push(`<tr><th>${k}</th><td>${v}</td></tr>`);
-  add("Fix Qualität", fixstr[d.gpsQuality] || "—");
+  add("Fix Qualität", d.fix);
   add("RAM freie Gesamt", d.RAMtotalFree);
   add("RAM min frei", d.RAMminFree);
   add("RAM größter Block", d.RAMlargestFreeBlock);

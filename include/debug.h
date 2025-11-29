@@ -7,7 +7,7 @@
 #define PRINTF_BUFFER 256
 
 void printSerialData(const char ch);
-void logGPSInfo();
+void logGPSInfo(const unsigned long loopmillis);
 
 //Print to both, serial and telnet:
 int write(const char *buf, const size_t len);

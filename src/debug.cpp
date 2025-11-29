@@ -8,7 +8,7 @@ extern TinyGPSLocation::Quality gpsFixQuality;
 /****************************************************************************************************************************/
 /****************************************************************************************************************************/
 
-void logGPSInfo()
+void logGPSInfo(const unsigned long loopmillis)
 {
     static unsigned long GPSSentences = 0;
     static unsigned long lastPrint = 0;
@@ -18,10 +18,9 @@ void logGPSInfo()
     if (CORE_DEBUG_LEVEL < ARDUHAL_LOG_LEVEL_INFO)
         return;
 
-    unsigned long t = millis();
-    if (t - lastPrint < 900ul)
+    if (loopmillis - lastPrint < 950ul)
         return;
-    lastPrint = t;
+    lastPrint = loopmillis;
 
     time_t now;
     struct tm tt;

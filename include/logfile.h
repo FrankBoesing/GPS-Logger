@@ -82,14 +82,14 @@ public:
 
 class cCompression
 {
-public:
+protected:
     void writeVarUint(File &f, uint32_t v);
     bool readVarUint(File &f, uint32_t &out);
     uint32_t zigzagEncode(int32_t x);
     int32_t zigzagDecode(uint32_t v);
 };
 
-class cPackedFileWrite : public cCompression, public cFileWrite
+class cPackedFileWrite : protected cCompression, public cFileWrite
 {
 private:
     int32_t lastLat, lastLon;
@@ -102,13 +102,12 @@ public:
     using cFileWrite::cFileWrite;
 };
 
-class cPackedFileRead : public cCompression, public cFileRead
+class cPackedFileRead : protected cCompression, public cFileRead
 {
 private:
     int32_t lastLat, lastLon;
     uint32_t lastT;
     bool readAbsolute(GPSPoint *p);
-
 public:
     using cFileRead::cFileRead;
     bool readPoint(GPSPoint *p);

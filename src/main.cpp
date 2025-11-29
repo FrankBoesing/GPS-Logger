@@ -6,7 +6,6 @@
 #include <time.h>
 #include "config.h"
 #include "utils.h"
-// #include "debug.h"
 #include "gps_hw.h"
 #include "web.h"
 #include "credentials.h"
@@ -16,21 +15,17 @@
 
 volatile eLogMode logMode = NoLog;
 volatile eLogCmd logCmd = nope;
-char gpsFixQuality = '0'; // Invalid = '0', GPS = '1', DGPS = '2', PPS = '3', RTK = '4', FloatRTK = '5', Estimated = '6', Manual = '7', Simulated = '8'
+char gpsFixQuality = '0';
 
 TinyGPSPlus gps;
-unsigned long lastGPSTimeSync = 0;
 
 /****************************************************************************************************************************/
 /****************************************************************************************************************************/
 /****************************************************************************************************************************/
 
-/****************************************************************************************************************************/
-
-static GPSPoint setGPSPoint()
+static struct tm gpstime()
 {
-  time_t utc;
-  struct tm t = {
+  return {
       .tm_sec = gps.time.second(),
       .tm_min = gps.time.minute(),
       .tm_hour = gps.time.hour(),
@@ -38,8 +33,12 @@ static GPSPoint setGPSPoint()
       .tm_mon = gps.date.month() - 1,
       .tm_year = gps.date.year() - 1900,
       .tm_isdst = 0};
+}
 
-  utc = timegm(&t);
+static GPSPoint setGPSPoint()
+{
+  struct tm t = gpstime();
+  time_t utc = timegm(&t);
 
   GPSPoint p = {
       .lat = (gpsfloat_t)gps.location.lat(),
@@ -50,54 +49,49 @@ static GPSPoint setGPSPoint()
 }
 
 // Uhrzeit von GPS setzen
-static void syncTimeFromGPS()
+static bool syncTimeFromGPS(const unsigned long loopmillis)
 {
-  unsigned long t = millis();
-  if (lastGPSTimeSync && (t - lastGPSTimeSync < GPS_TIMESYNC_INTERVAL_MS))
-    return;
+  static unsigned long lastGPSTimeSync = 0;
 
+#if GPS_TIMESYNC_ONCE
+  // sync nur, wenn noch keines stattgefunden hat
+  if (lastGPSTimeSync > 0)
+    return true;
   if (gps.date.month() == 0)
-    return;
+    return false;
+#else
+  if (gps.date.month() == 0)
+    return false;
+  if ((lastGPSTimeSync > 0) && (loopmillis - lastGPSTimeSync < GPS_TIMESYNC_INTERVAL_MS))
+    return true;
+#endif
 
-  lastGPSTimeSync = t;
-
-  struct tm tt = {
-      .tm_sec = gps.time.second(),
-      .tm_min = gps.time.minute(),
-      .tm_hour = gps.time.hour(),
-      .tm_mday = gps.date.day(),
-      .tm_mon = gps.date.month() - 1,
-      .tm_year = gps.date.year() - 1900,
-      .tm_isdst = 0};
-
-  struct timeval tv = {
-      .tv_sec = timegm(&tt)};
+  lastGPSTimeSync = loopmillis;
+  struct tm tt = gpstime();
+  struct timeval tv = {.tv_sec = timegm(&tt)};
 
   settimeofday(&tv, NULL);
   log_i("Zeit von GPS gesetzt");
+  return true;
 }
 
-static void saveToGPSLog()
+static void saveToGPSLog(const unsigned long loopmillis)
 {
   static unsigned long timeLastPoint = 0;
-  unsigned long t;
-  float speed;
 
   // Möglicherweise wurde durch die Web-ui das Loggen abgeschaltet:
   if (logCmd == stopNow)
   {
-    // closeLogFile();
     logfile.close();
     logCmd = nope;
     return;
   }
 
-  if (!lastGPSTimeSync)
+  if (!syncTimeFromGPS(loopmillis))
     return; // GPS Zeit wurde noch nicht gesetzt
 
-  if (!logfile && logCmd == startNow)
+  if (logCmd == startNow && !logfile)
   {
-    // openLogFile();
     logfile.open();
     logCmd = nope;
     return;
@@ -106,8 +100,7 @@ static void saveToGPSLog()
   if (!gps.location.isUpdated())
     return;
 
-  t = millis();
-  if (t - timeLastPoint < 950UL * GPS_LOGINTERVAL)
+  if (loopmillis - timeLastPoint < 950UL)
     return;
 
   gpsFixQuality = (char)gps.location.FixQuality();
@@ -116,13 +109,10 @@ static void saveToGPSLog()
         (gpsFixQuality > gps.location.Invalid)))
     return;
 
-  timeLastPoint = t;
+  timeLastPoint = loopmillis;
 
-  speed = gps.speed.isValid() ? gps.speed.kmph() : 0.0f;
-
-  if (!logfile && ((logMode == LogAfterMinSpeed && gps.speed.isValid() && speed >= MIN_SPEED_TO_START)))
+  if (!logfile && logMode == LogAfterMinSpeed && gps.speed.isValid() && (float)gps.speed.kmph() >= (float)MIN_SPEED_TO_START)
   {
-    // openLogFile();
     logfile.open();
     logCmd = nope;
     return;
@@ -132,7 +122,6 @@ static void saveToGPSLog()
   {
     GPSPoint p = setGPSPoint();
     logfile.writePoint(&p);
-    // logPoint(&p);
   }
 }
 
@@ -164,23 +153,22 @@ static void handleGPSData()
 
   while ((ch = GPSSerial.read()) >= 0)
   {
-    LEDON();
     if (!handleHwData(ch))
     {
-      newData = gps.encode(ch);
+      if (gps.encode(ch))
+        newData = true;
       printSerialData(ch);
-      if (newData)
-        break;
     }
   }
 
   if (newData)
-  {
-    syncTimeFromGPS();
-    saveToGPSLog();
-    logGPSInfo();
+  { // gets called with every GPS Sentence
+    LEDON();
+    unsigned long loopmillis = millis();
+    saveToGPSLog(loopmillis);
+    logGPSInfo(loopmillis);
+    LEDOFF();
   }
-  LEDOFF();
 }
 
 /****************************************************************************************************************************/
@@ -209,7 +197,7 @@ void setup()
   WiFi.mode(WIFI_AP_STA);
   WiFi.setAutoReconnect(true);
   WiFi.begin(WIFI_SSID, WIFI_PASS);
-  esp_wifi_set_max_tx_power(WiFI_MAX_POWER * 4);
+  esp_wifi_set_max_tx_power((int8_t)((float)WiFI_MAX_POWER * 4.0f));
   esp_wifi_set_ps(WiFi_POWER_MODE);
   WiFi.softAP(AP_SSID, AP_PASS);
   MDNS.begin(HOSTNAME);
@@ -235,4 +223,5 @@ void setup()
 void loop()
 {
   handleGPSData();
+  vTaskDelay(pdMS_TO_TICKS(1));
 }
