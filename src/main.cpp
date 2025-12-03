@@ -17,7 +17,6 @@
   IDEEN für zukünftige Erweiterungen:
   - Plugin-System für optionale Erfassung von - Höhe - Geschwindigkeit - Bordspannung - Temperatur.. etc
      Im Dateiheader müsste dafür ein Wert für die Konfiguration der Aufnahme hinterlegt sein.
-  - WLAN abschalten wenn in Bewegung? Nach x Minuten?  WiFi.disconnect(true); WiFi.mode(WIFI_OFF);
 */
 volatile eLogMode logMode = NoLog;
 volatile eLogCmd logCmd = nope;
@@ -224,7 +223,7 @@ void setup()
 
   GPSSerial.setRxBufferSize(1024);
   GPSSerial.begin(GPS_BAUD, SERIAL_8N1, GPS_RX_PIN, GPS_TX_PIN);
-  
+
   if (!isGPSConnected())
     error("GPS nicht verbunden!");
 

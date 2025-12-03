@@ -85,7 +85,7 @@ void cFileWrite::writePoint(const GPSPoint &p)
     else
     {
         writeCache[pointsInFileCache++] = p;
-        if (pointsInFileCache >= FILECACHE_MAXPOINTS)
+        if (pointsInFileCache >= FILECACHE_MAXPOINTS || pointsWritten == 0)
         {
             flush();
             pointsInFileCache = 0;
