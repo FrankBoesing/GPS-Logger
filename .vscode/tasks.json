@@ -1,0 +1,14 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Webserver (via python interpreter)",
+      "type": "shell",
+      "command": "${command:python.interpreterPath}",
+      "args": ["-m", "http.server", "8000"],
+      "options": { "cwd": "${workspaceFolder}/data/web" },
+      "presentation": { "reveal": "always", "panel": "shared" },
+      "problemMatcher": []
+    }
+  ]
+}

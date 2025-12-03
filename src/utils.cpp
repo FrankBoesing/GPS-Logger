@@ -1,4 +1,5 @@
 #include "utils.h"
+#include "web.h"
 
 /****************************************************************************************************************************/
 /****************************************************************************************************************************/
@@ -130,10 +131,14 @@ static int deleteFile(const char *filename)
 
 int deleteFiles(const char *filename)
 {
-  if (strcmp(filename, "*") == 0)
-    return deleteAllFiles(FILE_SUFFIX);
-
-  return deleteFile(filename);
+  bool ret;
+  if (strcmp(filename, "*") == 0) {
+    ret = deleteAllFiles(FILE_SUFFIX);
+  } else {
+    ret = deleteFile(filename);
+  }
+  uiSendFileList();
+  return ret;
 }
 
 // Sucht die älteste(newest = false) oder neueste (true) Datei.
@@ -176,6 +181,22 @@ bool findFile(const bool newest, char *filename, const size_t maxlen, time_t *la
 
   return found;
 }
+
+/****************************************************************************************************************************/
+
+void uiSendFileList()
+{
+  if (uiClientCount() > 0) {
+    JsonDocument doc;
+    JsonObject fileList = doc.to<JsonObject>();
+    readFileList(fileList);
+
+    String jsonString;
+    serializeJson(fileList, jsonString);
+    uiSendEvent(jsonString);
+  }
+}
+
 /****************************************************************************************************************************/
 
 // Prüfen ob GPS verbunden ist.

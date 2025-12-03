@@ -137,37 +137,37 @@ static void syncTimeFromGPS()
 
 /****************************************************************************************************************************/
 
-static void saveToGPSLog() // called once a second
+static void saveToGPSLog() // Wird sekündlich aufgerufen
 {
-
-  // Möglicherweise wurde durch die Web-ui das Loggen abgeschaltet:
-  if (logCmd == stopNow)
-  {
-    logfile.close();
-    logCmd = nope;
-  }
+  static bool booted = true;
 
   if (gps.gpstime > 0)
     syncTimeFromGPS();
 
-  logGPSInfo(gps);
-
-  if (!gps.valid)
-    return;
+  if (logCmd == stopNow)
+  { // Loggen durch die UI abgeschaltet
+    logCmd = nope;
+    logfile.close();
+  }
 
   if (!logfile)
   {
-    if (logCmd == startNow || (logMode == LogAfterMinSpeed && gps.speed >= (float)MIN_SPEED_TO_START))
+    if (logCmd == startNow || // Startkommandon (ui Button)
+        (logMode == LogAfterBoot && booted) || // Start nach Boot (1. Fix)
+        (logMode == LogAfterMinSpeed && gps.speed >= (float)MIN_SPEED_TO_START)) // Start nach Mindestgeschwindigkeit
     {
-      logfile.open(gps.gpstime);
       logCmd = nope;
+      booted = false;
+      logfile.open(gps.gpstime);
     }
   }
 
-  if (logfile)
+  if (gps.valid && logfile)
   {
     logfile.writePoint(gps.point);
   }
+
+  logGPSInfo(gps);
 }
 
 /****************************************************************************************************************************/
@@ -242,5 +242,6 @@ void setup()
 void loop()
 {
   handleGPSData();
+
   vTaskDelay(pdMS_TO_TICKS(1));
 }

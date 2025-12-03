@@ -62,7 +62,7 @@ protected:
 public:
     using cFile::cFile;
     // time wird zur Erzeugung des Dateinamens genutzt
-    void open(const time_t time);
+    virtual void open(const time_t time);
     void writePoint(const GPSPoint &p);
     void close();
     bool isActive(const char *path) { return (f && strcmp(f.path(), path) == 0); }
@@ -104,6 +104,7 @@ protected:
     void flush() override;
 
 public:
+    void open(const time_t time) override;
     using cFileWrite::cFileWrite;
 };
 

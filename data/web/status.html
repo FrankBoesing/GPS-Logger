@@ -1,56 +1,51 @@
 <!DOCTYPE html>
 <html lang="de">
-	<head>
-		<meta charset="UTF-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-		<link rel="stylesheet" href="style.css" />
-		<title>GPS Logger — Status</title>
-	</head>
 
-	<body>
-		<div class="container">
-			<h1>🏍️ GPS Logger</h1>
-			<p>Status</p>
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<link rel="stylesheet" href="style.css" />
+	<title>GPS Logger — Status</title>
+</head>
 
-			<nav class="nav">
-				<a href="index.html" class="nav-link">Dateien</a>
-				<a href="status.html" class="nav-link">Status</a>
-			</nav>
+<body>
+	<div class="container">
+		<h1>🏍️ GPS Logger</h1>
+		<p></p>
 
-			<div class="actions">
-				<button id="refreshBtn">🔄 Aktualisieren</button>
-			</div>
+		<nav class="nav">
+			<a href="index.html" class="nav-link">Dateien</a>
+			<a href="status.html" class="nav-link active">Status</a>
+		</nav>
 
-			<section id="statusInfo">
-				<div id="statusTableWrap">Lade Status…</div>
-				<p></p>
-				<form id="logModeForm">
-					<fieldset>
-						<legend>Autostart</legend>
-						<label><input type="radio" name="logmode" value="0" /> Aus</label
-						><br />
-						<label
-							><input type="radio" name="logmode" value="1" /> Nach Boot</label
-						><br />
-						<label
-							><input type="radio" name="logmode" value="2" /> Bei
-							Mindestgeschwindigkeit</label
-						>
-					</fieldset>
-					<div style="margin-top: 10px">
-						<button type="button" id="saveLogMode">💾 Speichern</button>
-					</div>
-				</form>
-			</section>
+		<div class="actions"></div>
 
-			<div style="text-align: center; margin-top: 18px">
-				<button id="deleteAllBtn" class="danger">
-					🗑️ Alle Dateien löschen
-				</button>
-			</div>
+		<section id="statusInfo">
+			<div id="statusTableWrap">Lade Status…</div>
+			<p></p>
+			<form id="logModeForm">
+				<fieldset>
+					<legend>Autostart</legend>
+					<label><input type="radio" name="logmode" value="0" /> Aus</label><br />
+					<label><input type="radio" name="logmode" value="1" /> Nach 1.Fix</label><br />
+					<label><input type="radio" name="logmode" value="2" /> Bei
+						Mindestgeschwindigkeit</label>
+				</fieldset>
+				<div style="margin-top: 10px">
+					<button type="button" id="saveLogMode">💾 Speichern</button>
+				</div>
+			</form>
+		</section>
 
-			<footer id="footer">lade...</footer>
+		<div style="text-align: center; margin-top: 18px">
+			<button id="deleteAllBtn" class="danger">
+				🗑️ Alle Dateien löschen
+			</button>
 		</div>
-		<script src="script.js"></script>
-	</body>
+
+		<footer id="footer">lade...</footer>
+	</div>
+	<script src="script.js"></script>
+</body>
+
 </html>

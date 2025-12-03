@@ -4,4 +4,7 @@
 
 void setupWebServer();
 
+size_t uiClientCount();
+void uiSendEvent(String &payload);
+
 #endif

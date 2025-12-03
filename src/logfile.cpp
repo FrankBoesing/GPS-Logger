@@ -7,6 +7,8 @@ SemaphoreHandle_t semFile;
 static size_t _fsTotalBytes;
 const size_t &fsTotalBytes = _fsTotalBytes; // make it read-only
 
+volatile bool fileListChanged = false;
+
 /****************************************************************************************************************************/
 /****************************************************************************************************************************/
 
@@ -64,7 +66,8 @@ void cFileWrite::close()
     f.close();
     xSemaphoreGive(semFile);
     pointsInFileCache = 0;
-    log_d("Datei geschlossen");
+    uiSendFileList();
+    log_i("Datei geschlossen");
 }
 
 // Flush all Points
@@ -158,19 +161,31 @@ static constexpr const double SCALE = 1e6; // 1e5 -> ~1.11 m resolution
 static constexpr const size_t SZ32 = sizeof(int32_t);
 static constexpr const uint8_t ESCAPE[3] = {0x7f, 0x7f, 0x7f};
 
+
+
+void cPackedFileWrite::open(const time_t time)
+{
+    cFileWrite::open(time);
+    f.write(ESCAPE, 3);
+    f.flush();
+    uiSendFileList();
+}
+
 // Flush all Points
 void cPackedFileWrite::flush()
 {
 
     int p = 0;
-    bool append = pointsWritten == 0 && f.size() > 0;
+/*
+    bool firstFlush = pointsWritten == 0;
+    bool append = firstFlush && f.size() > 0;
 
     if (append)
     { // Es wird an eine vorhandene Datei angefügt. Escape schreiben.
         f.write(ESCAPE, 3);
         log_d("Escape geschrieben");
     }
-
+*/
     if (pointsWritten == 0)
     { // 1. Punkt - unkomprimiert:
         lastLat = (int32_t)llround(writeCache[0].lat * SCALE);

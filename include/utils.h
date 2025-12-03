@@ -36,6 +36,8 @@ bool findFile(const bool newest, char *filename, const size_t maxlen, time_t *la
 void readFileList(JsonObject& fileList,  const char *fileext = FILE_SUFFIX);
 int deleteFiles(const char *filename);
 
+void uiSendFileList();
+
 bool isGPSConnected();
 [[noreturn]] void error(const char *msg);
 #endif

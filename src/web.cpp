@@ -13,9 +13,10 @@ static constexpr const char *_fix[] = {"-", "GPS", "DGPS", "PPS", "RTK", "FloatR
 static constexpr const char gpxheader[] = "<?xml version=\"1.0\" encoding=\"ISO-8859-1\" standalone=\"no\"?>\n<gpx version=\"1.1\" creator=\"gpx Logger\">\n<trk><trkseg>\n";
 static constexpr const char gpxfooter[] = "</trkseg></trk>\n</gpx>\n";
 static constexpr const char _argFile[] = "file";
+static constexpr const char _events[] = "/events";
 
 static AsyncWebServer server(80);
-static AsyncCorsMiddleware cors;
+static AsyncEventSource events(_events);
 
 static SemaphoreHandle_t semDL; // Download
 
@@ -34,18 +35,34 @@ static bool isBadRequest(AsyncWebServerRequest *request, const char *arg)
 
 /****************************************************************************************************************************/
 
+#define CORS true
 void setupWebServer()
 {
   semDL = xSemaphoreCreateBinary();
   xSemaphoreGive(semDL);
 
+  server.addHandler(&events);
+
+
+  if (CORS)
+  {
+    DefaultHeaders::Instance().addHeader("Access-Control-Allow-Origin", "*");
+    DefaultHeaders::Instance().addHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    DefaultHeaders::Instance().addHeader("Access-Control-Allow-Headers", "Content-Type, Accept, Origin, X-Requested-With");
+    DefaultHeaders::Instance().addHeader("Access-Control-Max-Age", "3600");
+    // OPTIONS handler hilft bei Preflight (wg CORS)
+    server.on(_events, HTTP_OPTIONS, [](AsyncWebServerRequest *req)
+              { req->send(204); });
+  }
+
+  events.onConnect([](AsyncEventSourceClient *client)
+                   { log_v("SSE client connected: id=%u\n", client->lastId()); });
+
   // List Files
   server.on("/files", HTTP_GET, [](AsyncWebServerRequest *request)
             {
-
               AsyncJsonResponse *response = new AsyncJsonResponse();
               JsonObject fileList = response->getRoot().to<JsonObject>();
-
               readFileList(fileList);
               response->setLength();
               request->send(response); });
@@ -307,14 +324,19 @@ void setupWebServer()
               request->send(LittleFS, path , "application/octet-stream", true); });
 
   /**********************/
-  // Static files
-  server.serveStatic("/", LittleFS, "/web").setDefaultFile("index.html");
 
-  if (CORE_DEBUG_LEVEL > ARDUHAL_LOG_LEVEL_WARN)
-  {
-    cors.setAllowCredentials(false); // for debug only
-    server.addMiddleware(&cors);
-  }
-
+  server.serveStatic("/", LittleFS, "/web").setDefaultFile("index.html"); // Static files
   server.begin();
+}
+
+/****************************************************************************************************************************/
+
+size_t uiClientCount()
+{
+  return events.count();
+}
+
+void uiSendEvent(String &payload)
+{
+  events.send(payload, "message");
 }

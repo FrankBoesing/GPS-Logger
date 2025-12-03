@@ -1,4 +1,6 @@
 const url = "http://gps.local";
+const tz = new Date().getTimezoneOffset() * -60;
+let files = null;
 
 function showSnackbar(msg, type = "default", duration = 3000) {
   let sb = document.getElementById("snackbar");
@@ -47,20 +49,16 @@ const fmtHM = (s) =>
     ((s % 3600) / 60) | 0
   ).padStart(2, "0")}`;
 
-async function loadFiles() {
-  const res = await fetch(url + "/files");
-  const d = await res.json();
+async function displayFiles() {
   const tbody = document.querySelector("#fileTable tbody");
-  tbody.innerHTML = "";
-  const tz = new Date().getTimezoneOffset() * -60;
-
-  if (!d.files || d.files.length === 0) {
+  if (!files || files.length === 0) {
     tbody.innerHTML =
       '<tr><td colspan="3" style="text-align:center;color:#777;">Keine Dateien gefunden</td></tr>';
     return;
   }
-  d.files.sort((a, b) => (a.path > b.path) - (a.path < b.path));
-  d.files.forEach((file) => {
+  tbody.innerHTML = "";
+  files.sort((a, b) => (a.path > b.path) - (a.path < b.path));
+  files.forEach((file) => {
     const tr = document.createElement("tr");
     const path = file["path"];
     const name = path.replace(/^.*[\\/]/, "").replace(/\.[^.]+$/, "");
@@ -76,6 +74,13 @@ async function loadFiles() {
     }
     tbody.appendChild(tr);
   });
+}
+
+async function loadFiles() {
+  const res = await fetch(url + "/files");
+  const d = await res.json();
+  files = d.files;
+  displayFiles();
 }
 
 async function loadFooter(d) {
@@ -122,7 +127,6 @@ async function loadFooter(d) {
 }
 
 async function loadStatus() {
-
   const r = await fetch(url + "/info");
   const d = await r.json();
   const sec = document.getElementById("statusInfo");
@@ -146,24 +150,26 @@ async function loadStatus() {
   await loadFooter(d);
 }
 
-async function loadFilesAndFooter() {
-  await loadFiles();
-  await loadFooter();
-}
-
 async function deleteFile(file) {
   if (!confirm(`Track "${file}" löschen?`)) return;
   await fetch(url + `/delete?file=/${file}`);
-  if (document.querySelector("#fileTable")) await loadFilesAndFooter();
   if (document.querySelector("#statusInfo")) await loadStatus();
 }
 
 async function deleteAll() {
   if (!confirm("Wirklich ALLE Tracks löschen?")) return;
   await fetch(url + `/delete?file=*`);
-  if (document.querySelector("#fileTable")) await loadFilesAndFooter();
   if (document.querySelector("#statusInfo")) await loadStatus();
 }
+
+const es = new EventSource(url + "/events");
+es.onmessage = (e) => {
+  const data = JSON.parse(e.data);
+  if (data.files) {
+    files = data.files;
+    displayFiles();
+  }
+};
 
 // Attach listeners conditionally depending on which page is loaded
 window.addEventListener("load", () => {
@@ -171,9 +177,8 @@ window.addEventListener("load", () => {
   const deleteAllBtn = document.getElementById("deleteAllBtn");
 
   if (document.querySelector("#fileTable")) {
-    if (refresh) refresh.addEventListener("click", loadFilesAndFooter);
-    if (deleteAllBtn) deleteAllBtn.style.display = "none";
-    loadFilesAndFooter();
+    loadFiles();
+    loadFooter();
 
     const toggleBtn = document.getElementById("toggleLogBtn");
     if (toggleBtn) {
@@ -184,7 +189,7 @@ window.addEventListener("load", () => {
         try {
           const r = await fetch(url + `/setlogactive?logActive=${newMode}`);
           if (r.ok) {
-            await loadFilesAndFooter();
+            await loadFooter();
             showSnackbar("OK", "success", 2000);
           } else showSnackbar("Fehler beim Umschalten", "error");
         } catch (e) {
@@ -196,7 +201,6 @@ window.addEventListener("load", () => {
   }
 
   if (document.querySelector("#statusInfo")) {
-    if (refresh) refresh.addEventListener("click", loadStatus);
     if (deleteAllBtn) deleteAllBtn.addEventListener("click", deleteAll);
     loadStatus();
     // attach save handler for log mode
@@ -223,15 +227,6 @@ window.addEventListener("load", () => {
       });
     }
   }
-
-  // mark active nav link
-  const links = document.querySelectorAll(".nav-link");
-  links.forEach((a) => {
-    const href = a.getAttribute("href");
-    const path = location.pathname.split("/").pop() || "index.html";
-    //  if ((path === '' || path === 'index.html') && href === 'index.html') a.classList.add('active');
-    if (path === href) a.classList.add("active");
-  });
 
   // start periodic footer refresh (once per page)
   if (!window._footerIntervalID && document.querySelector("#footer")) {
