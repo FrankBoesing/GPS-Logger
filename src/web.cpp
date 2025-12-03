@@ -1,0 +1,320 @@
+#include "web.h"
+
+#include <ArduinoJson.h>
+#include <ESPAsyncWebServer.h>
+
+#include "utils.h"
+#include "debug.h"
+
+extern GPSInfo gps;
+void savePrefs();
+
+static constexpr const char *_fix[] = {"-", "GPS", "DGPS", "PPS", "RTK", "FloatRTK", "Estimated", "Manual", "Simulated"};
+static constexpr const char gpxheader[] = "<?xml version=\"1.0\" encoding=\"ISO-8859-1\" standalone=\"no\"?>\n<gpx version=\"1.1\" creator=\"gpx Logger\">\n<trk><trkseg>\n";
+static constexpr const char gpxfooter[] = "</trkseg></trk>\n</gpx>\n";
+static constexpr const char _argFile[] = "file";
+
+static AsyncWebServer server(80);
+static AsyncCorsMiddleware cors;
+
+static SemaphoreHandle_t semDL; // Download
+
+/****************************************************************************************************************************/
+/****************************************************************************************************************************/
+
+static bool isBadRequest(AsyncWebServerRequest *request, const char *arg)
+{
+  bool r = !request->hasParam(arg);
+  if (r)
+  {
+    request->send(400, "Bad Request.");
+  }
+  return r;
+}
+
+/****************************************************************************************************************************/
+
+void setupWebServer()
+{
+  semDL = xSemaphoreCreateBinary();
+  xSemaphoreGive(semDL);
+
+  // List Files
+  server.on("/files", HTTP_GET, [](AsyncWebServerRequest *request)
+            {
+
+              AsyncJsonResponse *response = new AsyncJsonResponse();
+              JsonObject fileList = response->getRoot().to<JsonObject>();
+
+              readFileList(fileList);
+              response->setLength();
+              request->send(response); });
+
+  /**********************/
+
+  server.on("/info", HTTP_GET, [](AsyncWebServerRequest *request)
+            {
+              AsyncJsonResponse *response = new AsyncJsonResponse();
+              JsonObject doc = response->getRoot().to<JsonObject>();
+
+              doc["time_t"]  = gps.gpstime;
+              doc["fix"] = _fix[gps.quality];
+              doc["sat"] = gps.satellites;
+              // doc["uptime"] = millis();
+              doc["logMode"] = (int)logMode;
+
+              doc["totalBytes"] = fsTotalBytes;
+              doc["usedBytes"] = LittleFS.usedBytes();
+
+              doc["loggingActive"] = (bool)logfile;
+
+              doc["RAMminFree"] = ESP.getMinFreeHeap();
+              response->setLength();
+              request->send(response); });
+
+  /**********************/
+
+  // Set logMode in preferences
+  server.on("/setlogmode", HTTP_GET, [](AsyncWebServerRequest *request)
+            {
+              if (isBadRequest(request,"logMode")) return;
+
+              eLogMode mode = (eLogMode)request->getParam("logMode")->value().toInt();
+              if (mode <= LogAfterMinSpeed) {
+                logMode = mode;
+                savePrefs();
+              }
+              else request->send(400, "texte/plain", "Error");
+              request->send(200, "texte/plain", "OK"); });
+
+  // Sofortige Aktionen
+  server.on("/setlogactive", HTTP_GET, [](AsyncWebServerRequest *request)
+            {
+              if (isBadRequest(request,"logActive")) return;
+
+              eLogCmd mode = (eLogCmd)request->getParam("logActive")->value().toInt();
+              if (logCmd==nope &&
+                  ((mode == startNow && gps.quality > 0) || (mode == stopNow)) ) {
+                logCmd = mode; // logCMD wird nun im Hauptprogramm ausgeführt.
+              } else
+                request->send(400, "text/plain", "Error");
+              request->send(200, "text/plain", "OK"); });
+
+  /**********************/
+
+  server.on("/delete", HTTP_GET, [](AsyncWebServerRequest *request)
+            {
+              if (isBadRequest(request, _argFile)) return;
+              deleteFiles( request->getParam(_argFile)->value().c_str() );
+              request->send(200, "text/plain", "OK"); });
+
+  /**********************/
+
+  /*Chunked Download mit
+    - Konvertierung vom Binär- ins xml Format
+    - Doppelpufferung
+  */
+  server.on("/download", HTTP_GET, [](AsyncWebServerRequest *request)
+            {
+              if (isBadRequest(request, _argFile))
+                return;
+              const char *path = request->getParam(_argFile)->value().c_str();
+
+              if (logfile.isActive(path))
+              {
+                request->send(409, "text/plain", "File is currently being written to");
+                return;
+              }
+
+              if (!LittleFS.exists(path))
+              {
+                request->send(404, "text/plain", "File not found");
+                return;
+              }
+
+              // constexpr size_t CHUNK_SIZE = TCP_MSS; // 1436
+              constexpr size_t CHUNK_SIZE = 1460;
+              constexpr uint NUM_BUF = 2;
+              enum states
+              {
+                header,
+                points,
+                footer,
+                done
+              };
+
+              struct DContext
+              {
+                logfileR f;
+                states state;
+                uint bufIdx;
+                size_t len[NUM_BUF];
+                char buf[NUM_BUF][CHUNK_SIZE];
+              };
+
+              DContext *ctx = new DContext{path, header, 0, {{0}, {0}}, {{0}, {0}}};
+
+              // --- Buffer-Füllfunktion ---
+              auto fillBuffer = [ctx](char *buf, size_t bufSize) -> size_t
+              {
+                char tmp[512]; // Aufpassen dass ein Trackpoint hier rein passt (unten snprintf)
+                constexpr size_t tmpSize = sizeof(tmp);
+                size_t pos = 0;
+
+                // Statusmaschine für die Abfolge header->trackpoints->footer->done
+                switch (ctx->state)
+                {
+                case header:
+                {
+                  const size_t hlen = strlen(gpxheader);
+                  if (hlen < bufSize)
+                  {
+                    memcpy(buf, gpxheader, hlen);
+                    pos = hlen;
+                  }
+                  ctx->state = points;
+                }
+                  [[fallthrough]];
+
+                case points:
+                {
+                  // Eine Zeile sollte höchstens diese Länge haben. Bei Änderung von <trkpt> immer prüfen!
+                  constexpr size_t lineLength = 80;
+
+                  while (pos < bufSize - lineLength && ctx->f.available())
+                  {
+                    // size_t position = ctx->f.position();
+                    GPSPoint point;
+                    if (!ctx->f.readPoint(&point))
+                      break;
+
+                    struct tm tm;
+                    time_t ptime = (time_t)TIMEOFFSET + (time_t)point.time;
+                    gmtime_r(&ptime, &tm);
+
+                    int len = snprintf(tmp, tmpSize, "<trkpt lat=\"%.6f\" lon=\"%.6f\">", point.lat, point.lon);
+                    len += strftime(tmp + len, tmpSize - len, "<time>%FT%TZ</time></trkpt>\n", &tm);
+                    if (pos + len >= bufSize)
+                      break;
+
+                    memcpy(buf + pos, tmp, len);
+                    pos += len;
+                  }
+                  if (!ctx->f.available())
+                    ctx->state = footer;
+                  else
+                    break;
+                }
+                  [[fallthrough]];
+
+                case footer:
+                {
+                  const size_t flen = strlen(gpxfooter);
+                  if (pos + flen < bufSize)
+                  {
+                    memcpy(buf + pos, gpxfooter, flen);
+                    pos += flen;
+                    ctx->state = done;
+                  }
+                  break;
+                }
+
+                case done:
+                  break;
+
+                } // switch
+
+                return pos;
+              }; // fillBuffer()
+
+              // --- Erstbefüllung ---
+              ctx->len[0] = fillBuffer(ctx->buf[0], sizeof(ctx->buf[0]));
+              ctx->len[1] = 0;
+
+              auto generator = [ctx, fillBuffer](uint8_t *buffer, size_t maxLen, size_t index) -> size_t
+              {
+                if (!ctx)
+                  return 0;
+
+                char *active = ctx->buf[ctx->bufIdx];
+                size_t activeLen = ctx->len[ctx->bufIdx];
+
+                if (activeLen == 0 && ctx->state == done)
+                {
+                  delete ctx;
+                  return 0;
+                }
+
+                size_t toSend = min(activeLen, maxLen);
+                memcpy(buffer, active, toSend);
+
+                if (toSend >= activeLen)
+                {
+
+                  uint idx = (1 + ctx->bufIdx) & (NUM_BUF - 1); // Buffer wechseln
+                  ctx->len[idx] = fillBuffer(ctx->buf[idx], sizeof(ctx->buf[0]));
+                  ctx->bufIdx = idx;
+                }
+                else
+                {
+                  if (activeLen > toSend)
+                    memmove(active, active + toSend, activeLen - toSend);
+                  ctx->len[ctx->bufIdx] -= toSend;
+                }
+
+                return toSend;
+              }; // generator
+
+              esp_wifi_set_ps(WIFI_PS_NONE);
+              setCpuFrequencyMhz(CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ);
+              const time_t startDL = micros();
+
+               // Lesbaren Dateinamen erzeugen:
+              char dlname[64];
+              time_t _time;
+              struct tm _t;
+              str_to_ll(path + strlen(FILE_PREFIX), &_time); // FILE_PREFIX überspringen
+              const int timezone = request->getParam("tz")->value().toInt();
+              _time += timezone;
+              gmtime_r(&_time, &_t);
+              strftime(dlname, sizeof(dlname), "attachment; filename=\"" FILE_DONWNLOAD_NAME "\"", &_t);
+
+              xSemaphoreTake(semDL, portMAX_DELAY);
+              AsyncWebServerResponse *response =
+                  request->beginChunkedResponse("application/gpx+xml", generator);
+              response->addHeader("Content-Disposition", dlname);
+
+              request->onDisconnect([startDL]() {
+                              xSemaphoreGive(semDL);
+                              esp_wifi_set_ps(WiFi_POWER_MODE);
+                              log_d("Download: %lus", (unsigned long) (micros() - startDL) / SECOND);
+                              setCpuFrequencyMhz(CPU_FREQ_SLOW);
+                            });
+              request->send(response); });
+
+  /**********************/
+
+  server.on("/downloadraw", HTTP_GET, [](AsyncWebServerRequest *request)
+            {
+              if (isBadRequest(request, _argFile)) return;
+              const char *path = request->getParam(_argFile)->value().c_str();
+
+              if (logfile.isActive(path))
+              {
+                request->send(409, "text/plain", "File is currently being written to");
+                return;
+              }
+              request->send(LittleFS, path , "application/octet-stream", true); });
+
+  /**********************/
+  // Static files
+  server.serveStatic("/", LittleFS, "/web").setDefaultFile("index.html");
+
+  if (CORE_DEBUG_LEVEL > ARDUHAL_LOG_LEVEL_WARN)
+  {
+    cors.setAllowCredentials(false); // for debug only
+    server.addMiddleware(&cors);
+  }
+
+  server.begin();
+}

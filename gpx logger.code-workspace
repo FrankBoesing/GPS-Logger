@@ -1,0 +1,24 @@
+{
+	"folders": [
+		{
+			"name": "GPS-logger",
+			"path": ".."
+		}
+	],
+	"settings": {
+		"files.trimTrailingWhitespace": true,
+		"files.trimTrailingWhitespaceInRegexAndStrings": true,
+		"files.associations": {
+			"chrono": "cpp",
+			"ostream": "cpp",
+			"format": "cpp",
+			"thread": "cpp",
+			"array": "cpp",
+			"string": "cpp",
+			"string_view": "cpp",
+			"span": "cpp"
+		},
+		"files.trimFinalNewlines": false,
+		"files.insertFinalNewline": true
+	}
+}
