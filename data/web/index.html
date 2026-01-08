@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<link rel="icon"
+		href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏍️</text></svg>">
+	<link rel="stylesheet" href="style.css" />
+	<title>GPS Logger</title>
+</head>
+<body>
+	<div class="container">
+		<h1>🏍️ GPS Logger</h1>
+		<nav class="nav">
+			<button class="nav-link active" data-target="view-files">Dateien</button>
+			<button class="nav-link" data-target="view-status">Status</button>
+		</nav>
+		<div class="status-header">
+			<div id="footer">lade...</div>
+		</div>
+		<div id="view-files" class="view">
+			<div class="actions">
+				<button id="toggleLogBtn">⏺️ Log starten</button>
+				<div id="download" style="display:none;"><span class="btn-spinner"></span> Download läuft...</div>
+			</div>
+			<table id="fileTable">
+				<thead>
+					<tr>
+						<th>Datei</th>
+						<th>Dauer</th>
+						<th></th>
+					</tr>
+				</thead>
+				<tbody></tbody>
+			</table>
+		</div>
+		<div id="view-status" class="view" style="display:none;">
+			<section id="statusInfo">
+				<div id="statusTableWrap">Lade Status…</div>
+				<div class="btn-row" style="margin-top:10px;">
+					<label class="switch">
+						<input type="checkbox" id="appendToggle" />
+						<span class="switch-slider"></span>
+						<span class="switch-label">An Datei anfügen</span>
+					</label>
+					<label class="switch">
+						<input type="checkbox" id="autostartToggle" />
+						<span class="switch-slider"></span>
+						<span class="switch-label">Autostart</span>
+					</label>
+				</div>
+			</section>
+			<button id="settingsGearBtn" title="Einstellungen">⚙️</button>
+		</div>
+		<div id="view-settings" class="view" style="display:none;">
+			<section id="settings">
+				<h2>Einstellungen</h2>
+				<p> WLAN‑Netze</p>
+				<div id="wifi" class="wifi-section"></div>
+				<div></div>
+				<div style="text-align: center; margin-top: 18px">
+					<button id="deleteAllBtn" class="danger">🗑️ Alle Logs löschen</button>
+				</div>
+			</section>
+		</div>
+		<div id="copy">© F.Boesing 2025, Build: <span id="build"></span></div>
+	</div>
+	<script src="script.js"></script>
+</body>
+</html>

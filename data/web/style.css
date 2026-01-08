@@ -1,0 +1,111 @@
+:root {
+    --bg: #121212; --panel: #1e1e1e; --primary: #00bfff;
+    --danger: #ff3b3b; --text: #eee; --dim: #aaa; --brd: #333;
+}
+
+body {
+    margin: 0; font-family: "Segoe UI", system-ui, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.5;
+}
+
+.container {
+    position: relative; max-width: 600px; margin: 20px auto; background: var(--panel);
+    border: 1px solid rgba(255,255,255,0.05); border-radius: 16px; padding: 24px; box-shadow: 0 8px 32px #000;
+}
+
+/* Settings gear button inside container */
+#settingsGearBtn {
+    position: absolute; right: 20px; top: 18px; padding: 4px;
+    background: none; border: none; font-size: 20px; cursor: pointer;
+}
+#settingsGearBtn:hover { opacity: 0.9; transform: scale(1.05); }
+
+h1 { text-align: center; color: var(--primary); margin: 0 0 15px; }
+
+/* NAVIGATION & HEADER */
+.nav, .status-header, #footer, .status-indicator, .btn-row > label, .active-file {
+    display: flex; align-items: center;
+}
+.nav { background: rgba(0,0,0,0.2); padding: 4px; border-radius: 10px; gap: 4px; margin-bottom: 15px; }
+.nav-link {
+    flex: 1; padding: 10px; border-radius: 8px; background: 0 0;
+    color: var(--dim); border: none; cursor: pointer; font: inherit; transition: .2s;
+}
+.nav-link.active { background: var(--primary); color: #000; box-shadow: 0 4px 12px rgba(0,191,255,.3); }
+
+.status-header { background: rgba(0,0,0,.3); border: 1px solid var(--brd); border-radius: 12px; padding: 14px; margin-bottom: 25px; justify-content: center; }
+
+#footer { font-weight: 500; }
+.status-indicator { gap: 12px; }
+.status-text { font-weight: 700; letter-spacing: .5px; }
+.separator { color: #444; margin: 0 15px; }
+.storage-info { color: var(--dim); }
+.storage-val { color: var(--text); font-weight: 600; }
+
+/* ACTIONS & BUTTONS */
+.actions { display: flex; align-items: center; justify-content: space-between; gap: 15px; margin-bottom: 20px; }
+
+button { font: inherit; padding: 10px 18px; border: none; border-radius: 8px; background: #333; color: var(--text); cursor: pointer; transition: .2s; }
+button:hover:not(:disabled) { background: #444; }
+button:disabled { opacity: .4; cursor: not-allowed; }
+button.danger { background: #400; color: #f99; }
+button.danger:hover { background: var(--danger); color: #fff; }
+
+#toggleLogBtn { min-width: 160px; font-weight: 700; }
+#toggleLogBtn.danger { color: var(--danger); border: 1px solid rgba(255,59,59,.2); }
+
+/* TABLES */
+table { width: 100%; border-collapse: collapse; }
+th { color: var(--dim); font-size: .75rem; text-transform: uppercase; letter-spacing: 1px; padding: 8px; border-bottom: 2px solid var(--brd); text-align: left; }
+td { padding: 12px 8px; border-bottom: 1px solid var(--brd); vertical-align: middle; }
+
+.col-dur { text-align: center; color: var(--dim); }
+.col-del { text-align: right; }
+.active-file { color: var(--danger); font-weight: 600; gap: 6px; }
+tr:has(.active-file) { background: rgba(255,59,59,.05); }
+
+a.download { color: var(--primary); text-decoration: none; font-weight: 500; }
+
+.wifi-row { padding: 12px 8px; display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; box-sizing: border-box; }
+.wifi-row > input { flex: 1 1 auto; min-width: 0; }
+.wifi-row > button { flex: 0 0 auto; margin-left: 8px; }
+
+/* STATUS PAGE & SWITCHES */
+.status-table th { text-align: left; font-weight: 400; text-transform: none; width: 50%; }
+.btn-row { display: flex; gap: 12px; margin-top: 20px; }
+.btn-row > label { flex: 1; background: rgba(255,255,255,.03); border: 1px solid var(--brd); border-radius: 12px; padding: 12px; justify-content: center; cursor: pointer; }
+
+.switch input { display: none; }
+.switch-slider { width: 40px; height: 22px; background: #444; border-radius: 20px; position: relative; transition: .3s; }
+.switch-slider:before { content: ""; position: absolute; width: 16px; height: 16px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: .3s; }
+.switch input:checked + .switch-slider { background: var(--primary); }
+.switch input:checked + .switch-slider:before { transform: translateX(18px); }
+
+/* INDICATORS & SNACKBAR */
+.rec { width: 12px; height: 12px; border-radius: 50%; transform: translateZ(0); background: #555; }
+.rec.active { background: var(--danger); animation: recPulse 1.5s infinite; }
+
+@keyframes recPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255,59,59,.7); }
+    70% { box-shadow: 0 0 0 8px transparent; }
+}
+
+.snackbar {
+    position: fixed; bottom: 25px; left: 50%; transform: translateX(-50%) translateY(50px);
+    background: #333; padding: 10px 20px; border-radius: 30px; box-shadow: 0 5px 15px #000;
+    opacity: 0; transition: .3s; z-index: 100;
+}
+.snackbar.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.snackbar.error { background: var(--danger); color: #fff; }
+
+#copy { text-align: center; font-size: .6rem; color: #444; margin-top: 40px; border-top: 1px solid rgba(255,255,255,.02); padding-top: 10px; }
+
+@media (max-width: 600px) {
+    .container { margin: 10px; padding: 16px; border-radius: 12px; }
+    .actions, .btn-row { flex-direction: column; }
+    #toggleLogBtn { width: 100%; }
+}
+@media (max-width: 400px) { .separator { margin: 0 8px; } #footer { font-size: .9rem; } }
+
+@media (max-width: 480px) { #settingsGearBtn { right: 12px; top: 12px; font-size: 18px; }}
+@media (max-width: 360px) { #settingsGearBtn { right: 10px; top: 10px; font-size: 16px; }}

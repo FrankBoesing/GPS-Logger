@@ -1,0 +1,89 @@
+#ifndef LOGFILE_H
+#define LOGFILE_H
+
+#include "includes.h"
+
+#define FILE_PREFIX "/"
+#define FILE_SUFFIX ".vic"
+#define MAX_FILES 100u
+
+constexpr size_t LEN_FILENAME = 1 +
+								(sizeof(FILE_PREFIX) - 1) +
+								std::numeric_limits<long long>::digits10 + 1 +
+								(sizeof(FILE_SUFFIX) - 1);
+
+struct file_info_t
+{
+	time_t id;
+	time_t lastWrite;
+	bool active;
+	auto operator<=>(const file_info_t &o) const { return id <=> o.id; }
+	bool operator==(const file_info_t &o) const { return id == o.id; }
+};
+
+extern SortedStaticArray<file_info_t, MAX_FILES> filelist;
+
+void initLogfile();
+
+struct GPSPoint_t
+{
+	double lat;
+	double lon;
+	time_t time;
+};
+
+class logfileW
+{
+public:
+	void open(const time_t time); // time wird zur Erzeugung des Dateinamens genutzt
+	void writePoint(const double lat, const double lon, const time_t time, const bool forceFlush);
+	void close();
+	bool isActive(const char *path) { return (f && strcmp(f.path(), path) == 0); }
+	size_t getPoints() { return pointsWritten; }
+	void periodicFlush();
+	operator bool() const { return f; }
+
+protected:
+	GPSPoint_t writeCache[FILECACHE_MAXPOINTS];
+	size_t pointsInFileCache = 0;
+	size_t pointsWritten = 0;
+	File f;
+
+private:
+	int32_t lastLat, lastLon;
+	uint32_t lastT;
+	ulong lastFlush;
+	void flush();
+	void _flush_unlocked();
+	void writeVarUint(uint32_t v);
+	inline uint32_t zigzagEncode(int32_t x);
+};
+
+class logfileR
+{
+public:
+	bool open(const char *filename)
+	{
+		f.close();
+		f = LittleFS.open(filename, FILE_READ);
+		pointsRead = 0;
+		return (f && !f.isDirectory());
+	}
+	void close() { f.close(); }
+	bool readPoint(GPSPoint_t &p);
+	size_t getFileInfo(GPSPoint_t &firstp, GPSPoint_t &lastp);
+	operator bool() const { return f; }
+
+protected:
+	size_t pointsRead;
+	File f;
+
+private:
+	int32_t lastLat, lastLon;
+	uint32_t lastT;
+	bool readVarUint(uint32_t &out);
+	inline int32_t zigzagDecode(uint32_t v);
+	bool readAbsolute(GPSPoint_t &p);
+};
+
+#endif
