@@ -125,6 +125,7 @@ void setupWebServer()
 			  { request->send(http_NOCONTENT); });
 
 	/**********************/
+
 	server.on("/set", HTTP_POST, [](AsyncWebServerRequest *request)
 			  {
 				bool ok = false, prefs = false;
@@ -180,7 +181,8 @@ void setupWebServer()
 				if (ok && prefs)
 					savePrefs(); });
 	/**********************/
-
+	server.on("/delete", HTTP_OPTIONS, [](AsyncWebServerRequest *request)
+			  { request->send(http_NOCONTENT); });
 	server.on("/delete", HTTP_DELETE, [](AsyncWebServerRequest *request)
 			  {
 				if (isBadRequest(request, "file")) return;

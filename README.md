@@ -52,3 +52,5 @@ Wichtig: `include/credentials.h` enthält Zugangsdaten — bitte nicht ins Repos
 - Persistente Log-Optionen werden mittels `Preferences` (NVS) gespeichert.
 
 ![Screenshot der Statusseite](./doc/Statuspage.png)
+![Screenshot der Settings](./doc/Settings.png)
+
