@@ -10,7 +10,6 @@ void loadPrefs();
 void savePrefs();
 
 int id2filename(const time_t id, char *buf, const size_t szbuf);
-size_t trim_to_buffer(char *dest, const char *src, size_t dest_size);
 
 void filelistSetActive(File &f, bool active);
 

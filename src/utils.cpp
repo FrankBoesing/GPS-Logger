@@ -84,6 +84,7 @@ void boost(const bool fast)
 			isFast = true;
 		}
 		lastBoost = millis();
+
 		return;
 	}
 
@@ -172,32 +173,6 @@ static bool endsWith(const char *str, const char *suffix)
 	return strcmp(str + len - slen, suffix) == 0;
 }
 
-size_t trim_to_buffer(char *dest, const char *src, size_t dest_size)
-{
-	if (!src || !dest || dest_size == 0)
-		return 0;
-
-	const char *start = src;
-	while (*start && isspace((unsigned char)*start))
-		start++;
-
-	if (*start == '\0')
-	{
-		dest[0] = '\0';
-		return 0;
-	}
-	const char *end = start + strlen(start) - 1;
-	while (end > start && isspace((unsigned char)*end))
-		end--;
-
-	size_t len = (size_t)(end - start + 1);
-	if (len >= dest_size)
-		len = dest_size - 1;
-
-	memcpy(dest, start, len);
-	dest[len] = '\0';
-	return len;
-}
 /****************************************************************************************************************************/
 // Dateiliste
 
