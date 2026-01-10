@@ -37,7 +37,7 @@ static DContext dlCtx;
 /****************************************************************************************************************************/
 /****************************************************************************************************************************/
 
-void uiSendJson(const bool firstRequest)
+void uiSendJson(const bool fileList, const bool wifiCredentials, const bool staticData)
 {
 	static JsonDocument doc;
 	static uint sseId = 0;
@@ -47,16 +47,6 @@ void uiSendJson(const bool firstRequest)
 	boost(true);
 	doc.clear();
 
-	if (firstRequest)
-	{
-		doc["total"] = fsTotalBytes;
-		doc["build"] = LAST_BUILD_TIME;
-		JsonArray credArr = doc["wifi"].to<JsonArray>();
-		for (int i = 0; i < WIFI_MAX_NETWORKS; ++i)
-		{
-			credArr.add((const char*)wifiCreds[i].ssid);
-		}
-	}
 	doc["used"] = LittleFS.usedBytes();
 	doc["active"] = (int)logfile;
 	// doc["count"] = filelist.size();
@@ -65,17 +55,35 @@ void uiSendJson(const bool firstRequest)
 	doc["logMode"] = (int)logMode;
 	doc["logAppend"] = (int)logAppend;
 	doc["temp"] = temperatureRead();
+	doc["RAMminFree"] = ESP.getMinFreeHeap();
 
-	JsonArray arr = doc["files"].to<JsonArray>();
-	for (const auto &e : filelist.descending())
+	if (staticData)
 	{
-		JsonArray row = arr.add<JsonArray>();
-		row.add(e.id);
-		row.add(e.lastWrite);
-		row.add((int)e.active);
+		doc["total"] = fsTotalBytes;
+		doc["build"] = LAST_BUILD_TIME;
 	}
 
-	doc["RAMminFree"] = ESP.getMinFreeHeap();
+	if (wifiCredentials)
+	{
+		JsonArray credArr = doc["wifi"].to<JsonArray>();
+		for (const auto &e : wifiCreds)
+			credArr.add((const char *)e.ssid);
+		if (wifiCreds.size() < wifiCreds.capacity())
+			credArr.add("");
+	}
+
+	if (fileList)
+	{
+		JsonArray arr = doc["files"].to<JsonArray>();
+		for (const auto &e : filelist.descending())
+		{
+			JsonArray row = arr.add<JsonArray>();
+			row.add(e.id);
+			row.add(e.lastWrite);
+			row.add((int)e.active);
+		}
+	}
+
 	auto written = serializeJson(doc, JsonBuf, sizeof(JsonBuf));
 	if (written >= sizeof(JsonBuf) - 1)
 		log_w("Json Buffer zu klein!");
@@ -161,25 +169,34 @@ void setupWebServer()
 				}
 
 				// WiFi-Einstellungen
-				for (int i = 0; i <= WIFI_MAX_NETWORKS; ++i) {
-					char ssid[16];
-					char pass[16];
+				bool wifiChanged = false;
+				for (uint8_t i = 0; i < wifiCreds.capacity(); ++i) {
+					char ssid[15];
+					char pass[15];
 					snprintf(ssid,  sizeof(ssid), "wifi%d", i);
-					snprintf(pass,  sizeof(pass), "pass%d", i);
-					if (request->hasParam(ssid) && request->hasParam(pass)) {
-						if (request->getParam(ssid)->value().length() > 0 && request->getParam(pass)->value().length() > 0) {
-							strlcpy(wifiCreds[i].ssid, request->getParam(ssid)->value().c_str(), sizeof(wifiCreds[i].ssid));
-							strlcpy(wifiCreds[i].pass, request->getParam(pass)->value().c_str(), sizeof(wifiCreds[i].pass));
-						} else {
-							wifiCreds[i].ssid[0] = wifiCreds[i].pass[0] = '\0';
+					if (request->hasParam(ssid)) {
+						snprintf(pass,  sizeof(pass), "pass%d", i);
+						if (request->hasParam(pass)) {
+							wifiCredentials_t e = {};
+							if (request->getParam(ssid)->value().length() > 0 && request->getParam(pass)->value().length() > 0) {
+								strlcpy(e.ssid, request->getParam(ssid)->value().c_str(), sizeof(e.ssid));
+								strlcpy(e.pass, request->getParam(pass)->value().c_str(), sizeof(e.pass));
+							}
+							if (i < wifiCreds.size())
+								wifiCreds[i] = e;
+							else
+								wifiCreds.push_back(e);
+							ok = prefs = wifiChanged = true;
 						}
-						ok = prefs = true;
 					}
 				}
 
 				request->send(ok ? http_OK : http_BADREQUEST);
 				if (ok && prefs)
-					savePrefs(); });
+					savePrefs();
+				if (ok && wifiChanged) {
+					uiSendJson(false, true); } });
+
 	/**********************/
 	server.on("/delete", HTTP_OPTIONS, [](AsyncWebServerRequest *request)
 			  { request->send(http_NOCONTENT); });
@@ -193,7 +210,7 @@ void setupWebServer()
 				else
 					cnt = deleteFile(p);
 				request->send(cnt ? http_OK : http_ERROR);
-				if (cnt) uiSendJson(); });
+				if (cnt) uiSendJson(true, false, true); });
 
 	/**********************/
 
@@ -311,7 +328,7 @@ void setupWebServer()
 						boost(true);
 						client->send("{}", "message");
 						yield();
-						uiSendJson(true);
+						uiSendJson(true, true, true);
 						log_i("SSE client connected"); });
 
 	events.onDisconnect([](const auto *cb)

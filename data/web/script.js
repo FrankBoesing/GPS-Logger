@@ -113,8 +113,8 @@ async function displayWifi() {
 	const wifi = $("#wifi");
 	wifi.innerHTML = data.wifi?.map((ssid, idx) => {
 		return `<div class="wifi-row">
-			<input id="wifi${idx}_ssid" placeholder="SSID ${idx}" value="${ssid}" /><input id="wifi${idx}_pass" type="password" placeholder="Passwort ${idx}" value=""/><button id="saveWifi${idx}Btn">Speichern</button></div>`;
-	}).join("\n");
+			<input id="wifi${idx}_ssid" placeholder="SSID ${idx + 1}" value="${ssid}"><input id="wifi${idx}_pass" type="password" placeholder="Passwort ${idx + 1}"><button id="saveWifi${idx}Btn">Speichern</button></div>`;
+	}).join("");
 }
 
 async function displayFooter() {
@@ -186,7 +186,6 @@ window.addEventListener("load", () => {
 			t.disabled = true;
 			const query = new URLSearchParams({ [`wifi${idx}`]: ssid, [`pass${idx}`]: pass });
 			const r = await fetch(`${url}/set?${query}`, { method: 'POST' });
-			if (del) $(`#wifi${idx}_ssid`).value = $(`#wifi${idx}_pass`).value = "";
 			showSnackbar(r.ok ? (del ? "Gelöscht" : "Gespeichert") : "Fehler", r.ok ? "success" : "error");
 		} catch (e) {
 			showSnackbar("Netzwerkfehler", "error");

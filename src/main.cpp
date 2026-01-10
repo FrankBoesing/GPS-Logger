@@ -170,8 +170,16 @@ static void saveToGPSLog(TinyGPSPlus &gps) // Wird sekündlich aufgerufen
 /****************************************************************************************************************************/
 /****************************************************************************************************************************/
 /****************************************************************************************************************************/
-
-
+static void wifiMulti_run()
+{
+	if (WiFi.status() != WL_CONNECTED && WiFi.softAPgetStationNum() == 0) {
+        static unsigned long lastScan = 0;
+        if (millis() - lastScan > 10000) { // Nur alle 10 Sek.
+            wifiMulti.run();
+            lastScan = millis();
+        }
+    }
+}
 /****************************************************************************************************************************/
 
 void setup()
@@ -188,6 +196,7 @@ void setup()
 		;
 	GPSSerial.setTimeout(5000);
 
+	wifiCreds.resize(WIFI_MAX_NETWORKS);
 	if (!LittleFS.begin(false))
 		error("LittleFS Fehler!");
 
@@ -199,22 +208,20 @@ void setup()
 	WiFi.mode(WIFI_AP_STA);
 	esp_wifi_set_max_tx_power((int8_t)((float)WiFI_MAX_POWER * 4.0f));
 
-	WiFi.softAP(AP_SSID, AP_PASS, 1);
+	WiFi.softAP(AP_SSID, AP_PASS, 6);
 	delay(100); // Funktioniert besser mit delay.
 	loadPrefs();
 
+	if (wifiCreds.size()) {
+		for (const auto &e : wifiCreds)
+			wifiMulti.addAP(e.ssid, e.pass);
+		wifiMulti.run();
+	}
 	WiFi.setAutoReconnect(true);
 
-	for (int i = 0; i < WIFI_MAX_NETWORKS; ++i) {
-		if (strlen(wifiCreds[i].ssid) == 0) continue;
-  		wifiMulti.addAP(wifiCreds[i].ssid, wifiCreds[i].pass);
-	}
-	wifiMulti.run();
-	delay(100);
-
 	setupWebServer();
-
 	initLogfile();
+
 	if (logMode == LOGAUTOSTART)
 		logCmd = STARTNOW;
 
@@ -234,6 +241,7 @@ void setup()
 	log_i("Setup abgeschlossen.");
 
 	LEDOFF();
+	yield();
 }
 
 /****************************************************************************************************************************/
@@ -243,5 +251,6 @@ void loop()
 	startStop();
 	yield();
 	handleGPSData();
+	wifiMulti_run();
 	boost(false);
 }

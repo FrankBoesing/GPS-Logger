@@ -27,8 +27,7 @@
 #define MAX_IDLE_SECONDS (120UL * 60) // Max. Pausenlänge (120 Minuten) - danach wird eine neue Datei erstellt.
 
 // ---------- System ----------
-#define WIFI_MAX_NETWORKS 3
-#define WiFi_POWER_MODE WIFI_PS_MAX_MODEM
+#define WIFI_MAX_NETWORKS 5
 #define WiFI_MAX_POWER 6 // dBm, max 20 (ESP32-C3 Noname Boards oft am besten mit ~8 dBm. Höhere Werte bringen meist nichts)
 
 #define ENABLE_HEAT_REDUCTION true

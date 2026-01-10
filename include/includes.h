@@ -3,6 +3,7 @@
 
 #include <climits>
 #include <atomic>
+#include <vector>
 #include "sortedStaticArray.hpp"
 
 #include <Arduino.h>
@@ -34,6 +35,6 @@ extern ulong firstFix;
 extern gps_state_ctx_t gps_state;
 extern logfileW logfile;
 extern const size_t &fsTotalBytes;
-extern wifiCredentials_t wifiCreds[3];
+extern std::vector<wifiCredentials_t> wifiCreds;
 
 #endif

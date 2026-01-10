@@ -19,10 +19,13 @@ typedef enum : uint8_t
 	STARTNOW
 } log_cmd_t;
 
+
+#define WIFI_SSID_MAX_LEN 32
+#define WIFI_PASS_MAX_LEN 64
 struct wifiCredentials_t
 {
-	char ssid[24];
-	char pass[24];
+	char ssid[WIFI_SSID_MAX_LEN];
+	char pass[WIFI_PASS_MAX_LEN];
 };
 
 #endif

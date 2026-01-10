@@ -2,12 +2,11 @@
 #include <Preferences.h>
 
 extern SemaphoreHandle_t logfile_sem;
-wifiCredentials_t wifiCreds[WIFI_MAX_NETWORKS] = {0};
+std::vector<wifiCredentials_t> wifiCreds(WIFI_MAX_NETWORKS);
 
 void onWiFiEvent(arduino_event_id_t event)
 {
 	bool triggerMDNS = false;
-	uint16_t ms_beacons = 0;
 
 	switch (event)
 	{
@@ -18,18 +17,6 @@ void onWiFiEvent(arduino_event_id_t event)
 
 	case ARDUINO_EVENT_WIFI_AP_START:
 		triggerMDNS = true;
-		ms_beacons = WIFI_AP_BEACON_IDLE;
-		break;
-
-	case ARDUINO_EVENT_WIFI_AP_STACONNECTED:
-		ms_beacons = WIFI_AP_BEACON_DEFAULT;
-		break;
-
-	case ARDUINO_EVENT_WIFI_AP_STADISCONNECTED:
-		if (WiFi.softAPgetStationNum() == 0)
-		{
-			ms_beacons = WIFI_AP_BEACON_IDLE;
-		}
 		break;
 
 	default:
@@ -47,22 +34,6 @@ void onWiFiEvent(arduino_event_id_t event)
 		}
 	}
 
-	// Beacon-Hardware-Update: Nur ausführen, wenn ms_beacons gesetzt wurde
-	if (ms_beacons > 0)
-	{
-		wifi_config_t conf;
-		if (esp_wifi_get_config(WIFI_IF_AP, &conf) == ESP_OK)
-		{
-			if (conf.ap.beacon_interval != ms_beacons)
-			{
-				conf.ap.beacon_interval = ms_beacons;
-				if (esp_wifi_set_config(WIFI_IF_AP, &conf) == ESP_OK)
-				{
-					log_v("Beacon-Intervall angepasst: %d ms", ms_beacons);
-				}
-			}
-		}
-	}
 }
 
 void boost(const bool fast)
@@ -107,22 +78,15 @@ void loadPrefs()
 	logMode = (log_mode_t)pref.getChar("logMode", (char)DEFAULTLOGMODE);
 	logAppend = pref.getBool("logAppend", true);
 
-	// Lade gespeicherte WLAN-Credentials
-	for (int i = 0; i < WIFI_MAX_NETWORKS; ++i)
-	{
-		char keyS[16];
-		char keyP[16];
-		snprintf(keyS, sizeof(keyS), "wifi%d_ssid", i + 1);
-		snprintf(keyP, sizeof(keyP), "wifi%d_pass", i + 1);
-
-		wifiCreds[i].ssid[0] = wifiCreds[i].pass[0] = '\0';
-		if (pref.isKey(keyS))
-		{
-			pref.getString(keyS, wifiCreds[i].ssid, sizeof(wifiCreds[i].ssid));
-			pref.getString(keyP, wifiCreds[i].pass, sizeof(wifiCreds[i].pass));
-			log_d("WLAN geladen: %d: %s", i + 1, wifiCreds[i].ssid);
+	size_t count = pref.getUInt("wifi_count", 0);
+	if (count > 0) {
+		wifiCreds.resize(count);
+		size_t loadedBytes = pref.getBytes("wifi_data", wifiCreds.data(), count * sizeof(wifiCredentials_t));
+		if (loadedBytes != count * sizeof(wifiCredentials_t)) {
+				log_e("Fehler beim Laden der WLAN-Daten");
+				wifiCreds.clear();
 		}
-	}
+	} else wifiCreds.clear();
 	pref.end();
 }
 
@@ -135,29 +99,15 @@ void savePrefs()
 	pref.putChar("logMode", (char)logMode);
 	pref.putBool("logAppend", logAppend);
 
-	for (int i = 0; i < WIFI_MAX_NETWORKS; ++i)
-	{
-		char keyS[16];
-		char keyP[16];
-		snprintf(keyS, sizeof(keyS), "wifi%d_ssid", i + 1);
-		snprintf(keyP, sizeof(keyP), "wifi%d_pass", i + 1);
+	wifiCreds.erase( // leere Elemente entfernen
+		std::remove_if(wifiCreds.begin(), wifiCreds.end(),
+					   [](const auto &c)
+					   { return strlen(c.ssid) == 0; }),
+		wifiCreds.end());
 
-		if (strlen(wifiCreds[i].ssid) > 0)
-		{
-			pref.putString(keyS, wifiCreds[i].ssid);
-			pref.putString(keyP, wifiCreds[i].pass);
-			log_d("Gespeichertes WLAN %d: %s", i + 1, wifiCreds[i].ssid);
-		}
-		else
-		{
-			// Falls eine SSID gelöscht wurde, den Key aus NVS entfernen
-			if (pref.isKey(keyS))
-			{
-				pref.remove(keyS);
-				pref.remove(keyP);
-			}
-		}
-	}
+	pref.putUInt("wifi_count", wifiCreds.size());
+	pref.putBytes("wifi_data", wifiCreds.data(), wifiCreds.size() * sizeof(wifiCredentials_t));
+
 	pref.end();
 }
 
