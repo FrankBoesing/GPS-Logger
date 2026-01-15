@@ -69,6 +69,7 @@ static gps_eval_t gps_evaluate_fix(
 	float dt_s // Zeit seit letztem Fix [s]
 )
 {
+	static bool initialized = false;
 	gps_eval_t out = {};
 	float dist = 0, maxDist = 0, dCourse = 0;
 
@@ -99,7 +100,8 @@ static gps_eval_t gps_evaluate_fix(
 		return out;
 	};
 
-	if (last_lat == 0 && last_lon == 0) {
+	if (!initialized) {
+		initialized = true;
 		out.valid = (fixType >= 2);
 		return out; //init
 	}

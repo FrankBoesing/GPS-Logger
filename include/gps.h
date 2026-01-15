@@ -35,7 +35,7 @@ typedef struct
 	uint moveCount;
 	float accuracy_m;
 	float lastCourse;
-	double lastLat, lastLon;
+	float lastLat, lastLon;
 	gps_state_t state;
 	gps_motion_state_t motion_state;
 	bool mayFlush;
