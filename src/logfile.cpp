@@ -237,7 +237,7 @@ bool logfileR::readPoint(GPSPoint_t &p) {
     if (vT == MAGIC) return readAbsolute(p);
 
     uint32_t vLat, vLon;
-    readVarUint(vLat);
+    if (!readVarUint(vLat)) return false;
     if (!readVarUint(vLon)) return false;
 
     lastT   += vT;
