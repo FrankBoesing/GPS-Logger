@@ -33,15 +33,11 @@
 #define ENABLE_HEAT_REDUCTION true
 
 #if ENABLE_HEAT_REDUCTION
-    #define WIFI_AP_BEACON_IDLE    500
     #define CPU_FREQ_IDLE          80
 #else
-    // Wenn Hitze-Reduktion aus ist, sind IDLE und DEFAULT identisch
-    #define WIFI_AP_BEACON_IDLE    100
     #define CPU_FREQ_IDLE          CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ
 #endif
 
-#define WIFI_AP_BEACON_DEFAULT 100
 #define CPU_FREQ_DEFAULT       CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ
 
 
