@@ -144,7 +144,7 @@ static gps_eval_t gps_evaluate_fix(
 
 	// Kurs nur prüfen und aktualisieren, wenn wir uns wirklich bewegen (> 7 km/h)
     if (kmh > 7.0f) {
-        float dCourse = fabsf(course_deg - last_course);
+        dCourse = fabsf(course_deg - last_course);
         if (dCourse > 180.0f) dCourse = 360.0f - dCourse;
 
         // Wenn wir schnell sind (> 20 km/h), darf der Kurs nicht um > 45° springen
