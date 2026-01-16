@@ -33,7 +33,6 @@ void onWiFiEvent(arduino_event_id_t event)
 			MDNS.addService("http", "tcp", 80);
 		}
 	}
-
 }
 
 void boost(const bool fast)
@@ -79,14 +78,18 @@ void loadPrefs()
 	logAppend = pref.getBool("logAppend", true);
 
 	size_t count = pref.getUInt("wifi_count", 0);
-	if (count > 0) {
+	if (count > 0)
+	{
 		wifiCreds.resize(count);
 		size_t loadedBytes = pref.getBytes("wifi_data", wifiCreds.data(), count * sizeof(wifiCredentials_t));
-		if (loadedBytes != count * sizeof(wifiCredentials_t)) {
-				log_e("Fehler beim Laden der WLAN-Daten");
-				wifiCreds.clear();
+		if (loadedBytes != count * sizeof(wifiCredentials_t))
+		{
+			log_e("Fehler beim Laden der WLAN-Daten");
+			wifiCreds.clear();
 		}
-	} else wifiCreds.clear();
+	}
+	else
+		wifiCreds.clear();
 	pref.end();
 }
 

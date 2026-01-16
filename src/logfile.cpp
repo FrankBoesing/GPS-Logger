@@ -5,9 +5,6 @@ SortedStaticArray<file_info_t, MAX_FILES> filelist;
 logfileW logfile;
 SemaphoreHandle_t logfile_sem;
 
-static size_t _fsTotalBytes;
-const size_t &fsTotalBytes = _fsTotalBytes; // make it read-only
-
 /****************************************************************************************************************************/
 /****************************************************************************************************************************/
 
@@ -16,8 +13,6 @@ void initLogfile()
 {
 	logfile_sem = xSemaphoreCreateBinary();
 	xSemaphoreGive(logfile_sem);
-
-	_fsTotalBytes = LittleFS.totalBytes();
 }
 
 /****************************************************************************************************************************/

@@ -22,10 +22,10 @@ static const char *_state[GPS_STATE_COUNT] = {"INIT", "ACQUIRE", "LOCKED", "DEGR
 
 typedef struct
 {
-	gps_invalid_reason_t reason; // Ablehnungsgrund für !valid
-	bool valid;					 // darf geloggt werden?
 	float accuracy_m;			 // geschätzte horizontale Genauigkeit
 	float dist;					 // berechnete Entfernung
+	bool valid;					 // darf geloggt werden?
+	gps_invalid_reason_t reason; // Ablehnungsgrund für !valid
 } gps_eval_t;
 
 /****************************************/

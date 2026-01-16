@@ -13,7 +13,8 @@ std::atomic<log_mode_t> logMode = NOLOG;
 std::atomic<bool> logAppend = 1;
 std::atomic<log_cmd_t> logCmd = NOPE;
 
-time_t utc = 0;
+static size_t _fsTotalBytes;
+const size_t &fsTotalBytes = _fsTotalBytes; // make it read-only
 ulong firstFix = 0;
 gps_state_ctx_t gps_state = {};
 
@@ -21,12 +22,12 @@ gps_state_ctx_t gps_state = {};
 /****************************************************************************************************************************/
 /****************************************************************************************************************************/
 
-static void saveToGPSLog(TinyGPSPlus &gps);
+static void saveToGPSLog(TinyGPSPlus &gps, const time_t &utc);
 
-static time_t timeFromGPS(TinyGPSPlus &gps)
+static void timeFromGPS(TinyGPSPlus &gps, time_t &utc)
 {
 	if (!gps.time.isValid() || !gps.date.isValid() || gps.date.month() < 1)
-		return 0;
+		return;
 
 	static time_t lastSystemTimeSync = 0;
 	struct timeval tv;
@@ -42,25 +43,24 @@ static time_t timeFromGPS(TinyGPSPlus &gps)
 
 	const time_t t = mktime(&tm);
 	if (t <= 0)
-		return 0;
+		return;
 
-	utc = t;
-
-	if (t - lastSystemTimeSync > 15 * 60) // Sync alle 15 Minuten
+	if (lastSystemTimeSync == 0 || t - lastSystemTimeSync > 15 * 60) // Sync alle 15 Minuten
 	{
-		tv.tv_sec = utc;
+		tv.tv_sec = t;
 		tv.tv_usec = gps.time.centisecond() * 10000; // 1/100 s → µs
 		settimeofday(&tv, NULL);
 		lastSystemTimeSync = t;
 		log_d("Systemzeit von GPS gesetzt.");
 	}
-	return t;
+
+	utc = t;
+	return;
 }
 
 static void handleGPSData()
 {
 	static TinyGPSPlus gps;
-	static time_t lastUtc;
 	int ch;
 
 	while ((ch = GPSSerial.read()) >= 0)
@@ -83,13 +83,9 @@ static void handleGPSData()
 		if (gps.encode((char)ch))
 		{
 			LEDON();
-
-			utc = timeFromGPS(gps);
-			if (utc > lastUtc)
-			{
-				lastUtc = utc;
-				saveToGPSLog(gps);
-			}
+			time_t utc = 0;
+			timeFromGPS(gps, utc);
+			saveToGPSLog(gps, utc);
 
 			LEDOFF();
 			return;
@@ -99,7 +95,7 @@ static void handleGPSData()
 
 /****************************************************************************************************************************/
 /****************************************************************************************************************************/
-static void startStop()
+static void startStop(const time_t &utc)
 {
 	static bool booted = true;
 	const log_cmd_t cmd = logCmd;
@@ -108,7 +104,7 @@ static void startStop()
 	{ // Loggen durch die UI abgeschaltet
 		logfile.close();
 	}
-	else if (!logfile && utc > 0)
+	else if (!logfile)
 	{
 		if (cmd == STARTNOW ||					 // Startkommando (ui Button)
 			(logMode == LOGAUTOSTART && booted)) // Start nach Boot (1. Fix)
@@ -116,6 +112,7 @@ static void startStop()
 			log_d("startlog");
 			booted = false;
 			logfile.open(utc);
+			yield();
 		}
 	}
 
@@ -125,14 +122,15 @@ static void startStop()
 
 /****************************************************************************************************************************/
 #define TIME_GPS_HANDLING false
-static void saveToGPSLog(TinyGPSPlus &gps) // Wird sekündlich aufgerufen
+static void saveToGPSLog(TinyGPSPlus &gps, const time_t &utc) // Wird sekündlich aufgerufen
 {
 	static time_t prevUtc = 0;
-	const ulong m = micros();
 
-	const uint8_t fix = gps.location.FixQuality() - '0';
-	if (firstFix == 0 && fix > 0)
-		firstFix = m;
+	if (prevUtc == utc)
+		return;
+
+	const ulong m = micros();
+	startStop(utc);
 
 	float dt_gps = 1.0f;
 	if (prevUtc != 0 && utc > prevUtc)
@@ -140,6 +138,10 @@ static void saveToGPSLog(TinyGPSPlus &gps) // Wird sekündlich aufgerufen
 		dt_gps = (float)(utc - prevUtc);
 	}
 	prevUtc = utc;
+
+	const uint8_t fix = gps.location.FixQuality() - '0';
+	if (firstFix == 0 && fix > 0)
+		firstFix = m;
 
 	bool ok = gps_state_update((gps_data_t){
 								   .lat = gps.location.lat(),
@@ -207,6 +209,8 @@ void setup()
 	if (!LittleFS.exists("/web/index.html"))
 		error("LittleFS: WEBUI nicht vorhanden");
 
+	_fsTotalBytes = LittleFS.totalBytes();
+
 	WiFi.onEvent(onWiFiEvent);
 	WiFi.setHostname(HOSTNAME); // muss die erste Einstellung sein
 	WiFi.mode(WIFI_AP_STA);
@@ -224,8 +228,8 @@ void setup()
 	}
 	WiFi.setAutoReconnect(true);
 
-	setupWebServer();
 	initLogfile();
+	setupWebServer();
 
 	if (logMode == LOGAUTOSTART)
 		logCmd = STARTNOW;
@@ -253,8 +257,6 @@ void setup()
 
 void loop()
 {
-	startStop();
-	yield();
 	handleGPSData();
 	wifiMulti_run();
 	boost(false);

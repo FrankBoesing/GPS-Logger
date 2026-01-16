@@ -30,7 +30,6 @@ extern std::atomic<log_mode_t> logMode;
 extern std::atomic<bool> logAppend;
 extern std::atomic<log_cmd_t> logCmd;
 
-extern time_t utc;
 extern ulong firstFix;
 extern gps_state_ctx_t gps_state;
 extern logfileW logfile;
