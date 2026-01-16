@@ -29,6 +29,14 @@ typedef enum : uint8_t
 
 typedef struct
 {
+	double lat, lng;
+	float hdop, kmh, course;
+	float dt_gps;
+	uint8_t satellites;
+	uint8_t fix;
+} gps_data_t;
+typedef struct
+{
 	uint goodFixCount; // aufeinanderfolgende gute Fixes
 	uint badFixCount;  // aufeinanderfolgende schlechte Fixes
 	uint stopCount;
@@ -43,17 +51,6 @@ typedef struct
 
 /****************************************/
 
-bool gps_state_update(
-	gps_state_ctx_t &ctx,
-
-	// Rohdaten vom GPS
-	uint fixType,
-	uint numSV,		  // verwendete Satelliten
-	float hdop,		  // Horizontal DOP
-	float kmh,		  // km/h
-	float course_deg, // Kurs [0..360]
-	double lat,
-	double lon,
-	float dt_s);
+bool gps_state_update(const gps_data_t &data, gps_state_ctx_t &ctx);
 
 #endif

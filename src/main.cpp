@@ -130,7 +130,7 @@ static void saveToGPSLog(TinyGPSPlus &gps) // Wird sekündlich aufgerufen
 	static time_t prevUtc = 0;
 	const ulong m = micros();
 
-	const uint fix = gps.location.FixQuality() - '0';
+	const uint8_t fix = gps.location.FixQuality() - '0';
 	if (firstFix == 0 && fix > 0)
 		firstFix = m;
 
@@ -141,15 +141,17 @@ static void saveToGPSLog(TinyGPSPlus &gps) // Wird sekündlich aufgerufen
 	}
 	prevUtc = utc;
 
-	const bool ok = gps_state_update(gps_state,
-									 fix,
-									 gps.satellites.value(),
-									 (float)gps.hdop.hdop(),
-									 (float)gps.speed.kmph(),
-									 (float)gps.course.deg(),
-									 gps.location.lat(),
-									 gps.location.lng(),
-									 dt_gps);
+	bool ok = gps_state_update((gps_data_t){
+								   .lat = gps.location.lat(),
+								   .lng = gps.location.lng(),
+								   .hdop = (float)gps.hdop.hdop(),
+								   .kmh = (float)gps.speed.kmph(),
+								   .course = (float)gps.course.deg(),
+								   .dt_gps = dt_gps,
+								   .satellites = (uint8_t)gps.satellites.value(),
+								   .fix = fix},
+							   gps_state);
+
 	if (logfile)
 	{
 		if (ok)
@@ -172,13 +174,15 @@ static void saveToGPSLog(TinyGPSPlus &gps) // Wird sekündlich aufgerufen
 /****************************************************************************************************************************/
 static void wifiMulti_run()
 {
-	if (WiFi.status() != WL_CONNECTED && WiFi.softAPgetStationNum() == 0) {
-        static unsigned long lastScan = 0;
-        if (millis() - lastScan > 10000) { // Nur alle 10 Sek.
-            wifiMulti.run();
-            lastScan = millis();
-        }
-    }
+	if (WiFi.status() != WL_CONNECTED && WiFi.softAPgetStationNum() == 0)
+	{
+		static unsigned long lastScan = 0;
+		if (millis() - lastScan > 10000)
+		{ // Nur alle 10 Sek.
+			wifiMulti.run();
+			lastScan = millis();
+		}
+	}
 }
 /****************************************************************************************************************************/
 
@@ -212,7 +216,8 @@ void setup()
 	delay(100); // Funktioniert besser mit delay.
 	loadPrefs();
 
-	if (wifiCreds.size()) {
+	if (wifiCreds.size())
+	{
 		for (const auto &e : wifiCreds)
 			wifiMulti.addAP(e.ssid, e.pass);
 		wifiMulti.run();
