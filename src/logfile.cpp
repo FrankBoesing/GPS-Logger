@@ -191,7 +191,7 @@ bool logfileR::readVarUint(uint32_t &out)
 			break;
 		shift += 7;
 		if (++tries > 5)
-			break; // safety (uint32 braucht max 5 Bytes)
+			return false; // safety (uint32 braucht max 5 Bytes)
 	}
 	out = result;
 	return true;
