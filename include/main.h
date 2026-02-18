@@ -1,6 +1,4 @@
-#ifndef MAIN_H
-#define MAIN_H
-
+#pragma once
 #include "includes.h"
 
 #define MILLISECOND 1000UL // us
@@ -28,4 +26,4 @@ struct wifiCredentials_t
 	char pass[WIFI_PASS_MAX_LEN];
 };
 
-#endif
+#define OPTSIZE __attribute__((optimize("Os")))

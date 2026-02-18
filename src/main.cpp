@@ -2,12 +2,6 @@
 #include <WiFiMulti.h>
 #include <TinyGPSPlus.h>
 
-/*
-	IDEEN für zukünftige Erweiterungen:
-	- Plugin-System für optionale Erfassung von - Höhe - Geschwindigkeit - Bordspannung - Temperatur.. etc
-		 Im Dateiheader müsste dafür ein Wert für die Konfiguration der Aufnahme hinterlegt sein.
-*/
-
 WiFiMulti wifiMulti;
 std::atomic<log_mode_t> logMode = NOLOG;
 std::atomic<bool> logAppend = 1;
@@ -17,6 +11,7 @@ static size_t _fsTotalBytes;
 const size_t &fsTotalBytes = _fsTotalBytes; // make it read-only
 ulong firstFix = 0;
 gps_state_ctx_t gps_state = {};
+
 
 /****************************************************************************************************************************/
 /****************************************************************************************************************************/
@@ -80,14 +75,15 @@ static void handleGPSData()
 				buf[buflen++] = (char)ch;
 		}
 
-		if (gps.encode((char)ch))
+		if (gps.encode((char) ch))
 		{
-			LEDON();
+			digitalWrite(LED, HIGH);
+
 			time_t utc = 0;
 			timeFromGPS(gps, utc);
 			saveToGPSLog(gps, utc);
 
-			LEDOFF();
+			digitalWrite(LED, LOW);
 			return;
 		}
 	}
@@ -95,6 +91,7 @@ static void handleGPSData()
 
 /****************************************************************************************************************************/
 /****************************************************************************************************************************/
+
 static void startStop(const time_t &utc)
 {
 	static bool booted = true;
@@ -109,7 +106,7 @@ static void startStop(const time_t &utc)
 		if (cmd == STARTNOW ||					 // Startkommando (ui Button)
 			(logMode == LOGAUTOSTART && booted)) // Start nach Boot (1. Fix)
 		{
-			log_d("startlog");
+			log_d("Start log");
 			booted = false;
 			logfile.open(utc);
 			yield();
@@ -173,6 +170,10 @@ static void saveToGPSLog(TinyGPSPlus &gps, const time_t &utc) // Wird sekündlic
 
 /****************************************************************************************************************************/
 /****************************************************************************************************************************/
+
+#pragma GCC push_options
+#pragma GCC optimize("Os")
+
 /****************************************************************************************************************************/
 static void wifiMulti_run()
 {
@@ -188,10 +189,33 @@ static void wifiMulti_run()
 }
 /****************************************************************************************************************************/
 
+static bool error(const char *msg = nullptr)
+{
+	static char err[32] = {};
+	static ulong t = 0;
+
+	if (msg)
+		strlcpy(err, msg, sizeof(err));
+
+	if (err[0]) {
+
+		const ulong m = millis();
+		if (m - t > 80)
+		{
+			t = m;
+			digitalWrite(LED, !digitalRead(LED) );
+			log_e("%s", err);
+		}
+		return true;
+	}
+
+	return false;
+}
+
 void setup()
 {
 	pinMode(LED, OUTPUT);
-	LEDON();
+	digitalWrite(LED, HIGH);
 
 	WiFi.useStaticBuffers(true);
 
@@ -249,7 +273,7 @@ void setup()
 
 	log_i("Setup abgeschlossen.");
 
-	LEDOFF();
+	digitalWrite(LED, LOW);
 	yield();
 }
 
@@ -257,7 +281,12 @@ void setup()
 
 void loop()
 {
-	handleGPSData();
 	wifiMulti_run();
-	boost(false);
+	if (!error())
+		{
+			handleGPSData();
+			boost();
+		}
 }
+
+#pragma GCC pop_options

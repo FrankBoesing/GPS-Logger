@@ -1,4 +1,6 @@
 #include "includes.h"
+#pragma GCC push_options
+#pragma GCC optimize("Os")
 
 /****************************************************************************************************************************/
 #if GPS_MODEL == UBLOX
@@ -109,3 +111,6 @@ void hwinit()
 #else
 void hwinit() {};
 #endif // UBX
+
+
+#pragma GCC pop_options

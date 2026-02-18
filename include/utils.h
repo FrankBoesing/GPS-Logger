@@ -4,7 +4,7 @@
 #include "includes.h"
 
 void onWiFiEvent(arduino_event_id_t event);
-void boost(const bool fast);
+void boost(const bool fast = false);
 
 void loadPrefs();
 void savePrefs();
@@ -16,7 +16,7 @@ void filelistSetActive(File &f, bool active);
 size_t readFileList(const char *fileext = FILE_SUFFIX);
 size_t deleteAllFiles();
 size_t deleteFile(const time_t id);
+
 void cleanupStorage();
 
-[[noreturn]] void error(const char *msg);
 #endif

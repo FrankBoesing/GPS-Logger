@@ -2,11 +2,11 @@
 #define GPS_H
 #include <Arduino.h>
 
-#define SPEED_MOVE_KMH 3.0f
-#define SPEED_STOP_KMH 1.0f
+#define SPEED_MOVE_KMH 2.5f
+#define SPEED_STOP_KMH 1.5f
 
-#define DIST_MOVE_M 2.0f // Bewegung sichtbar (m)
-#define DIST_STOP_M 0.8f // Driftgrenze (m)
+#define DIST_MOVE_M 4.0f // Bewegung sichtbar (m)
+#define DIST_STOP_M 1.5f // Driftgrenze (m)
 
 #define MOVE_CONFIRM_CNT 1 // Sekunden
 #define STOP_CONFIRM_CNT 2 // Sekunden

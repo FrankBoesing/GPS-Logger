@@ -9,8 +9,8 @@
 #define GPS_BAUD 9600
 #define GPS_MODEL UBLOX
 
-#define GPS_MIN_SATELLITES 4 // Mindestanzahl Satelliten
-#define GPS_MIN_HDOP 3.0
+#define GPS_MIN_SATELLITES 5 // Mindestanzahl Satelliten
+#define GPS_MIN_HDOP 	2.8f
 #define DEFAULTLOGMODE NOLOG
 
 // ---------- WiFi ----------

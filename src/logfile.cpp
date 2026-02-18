@@ -17,10 +17,10 @@ void initLogfile()
 
 /****************************************************************************************************************************/
 
-static constexpr long SCALE = 10000000L;
-static constexpr double RSCALE = 1.0 / SCALE;
-static constexpr size_t SZ32 = sizeof(int32_t);
-static constexpr uint32_t MAGIC = 0xbabeef;
+static const constexpr long SCALE = 10000000L;
+static const constexpr double RSCALE = 1.0 / SCALE;
+static const constexpr size_t SZ32 = sizeof(int32_t);
+static const constexpr uint32_t MAGIC = 0xbabeef;
 
 // Eine Klasse ist hier am praktischten:
 
@@ -106,15 +106,15 @@ void logfileW::writeVarUint(uint32_t v)
 	f.write((uint8_t)v);
 }
 
-inline uint32_t logfileW::zigzagEncode(int32_t x)
+uint32_t logfileW::zigzagEncode(int32_t x)
 {
 	return (uint32_t)((uint32_t)(x << 1) ^ (uint32_t)(x >> 31));
 }
 
 void  logfileW::_flush_unlocked() {
-    lastFlush = micros();
     if (pointsInFileCache == 0 || !f) return;
 
+	lastFlush = micros();
     size_t p = 0;
 
     if (pointsWritten == 0) {

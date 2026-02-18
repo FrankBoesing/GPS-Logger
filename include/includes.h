@@ -15,7 +15,6 @@
 #include <stdlib.h>
 
 #include "config.h"
-#include "debug.h"
 #include "logfile.h"
 #include "utils.h"
 #include "gps_hw.h"

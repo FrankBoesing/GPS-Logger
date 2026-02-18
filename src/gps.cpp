@@ -17,152 +17,204 @@ typedef enum : uint8_t
 	r_COUNT
 } gps_invalid_reason_t;
 
-static const char *_qreason[gps_invalid_reason_t::r_COUNT] = {"", "NO FIX", "CNT SATS", "MIN HDOP", "ACCURACY", "JUMPFILTER", "COURSE", "HDOP SLOW", "HDOP MED", "HDOP FAST"};
-static const char *_state[GPS_STATE_COUNT] = {"INIT", "ACQUIRE", "LOCKED", "DEGRADED", "LOST"};
+static constexpr const char *_qreason[gps_invalid_reason_t::r_COUNT] = {"", "NO FIX", "CNT SATS", "MIN HDOP", "ACCURACY", "JUMPFILTER", "COURSE", "HDOP SLOW", "HDOP MED", "HDOP FAST"};
+static constexpr const char *_state[GPS_STATE_COUNT] = {"INIT", "ACQUIRE", "LOCK", "DEGRADED", "LOST"};
 
-typedef struct
-{
-	float accuracy_m;			 // geschätzte horizontale Genauigkeit
-	float dist;					 // berechnete Entfernung
-	bool valid;					 // darf geloggt werden?
-	gps_invalid_reason_t reason; // Ablehnungsgrund für !valid
+typedef struct {
+    bool  valid;
+    float accuracy_m;
+    float dist;
+
+    float confidence;   // 0..1
+    float q_hdop;
+    float q_jump;
+    float q_course;
+    float q_sats;
+
+    gps_invalid_reason_t reason;
 } gps_eval_t;
 
 /****************************************/
 
-constexpr float EARTH_RADIUS_M_F = 6371000.0f;
-constexpr float DEG2RAD_F = 0.01745329251994329577f;
+const constexpr float EARTH_RADIUS_M_F = 6371000.0f;
+const constexpr float DEG2RAD_F = 0.01745329251994329577f;
 
 /* Equirectangular Approximation (Pythagoras auf einer Ebene)
 	ist bis einige km Distanz völlig ausreichend exakt.
+	fast_cosf() ist völlig ausreichend. Wird hier genutzt um Flash zu sparen, nicht für Geschwindigkeit.
 */
+static inline float fast_cosf(float x)
+{
+    float x2 = x * x;
+    return 1.0f + x2 * (-0.5f + x2 * (1.0f / 24.0f));
+}
+
 static float distance_m(float lat1, float lon1, float lat2, float lon2)
 {
-    // Umrechnung von Grad in Bogenmaß (Radiant)
-    float lat1_rad = lat1 * DEG2RAD_F;
-    float lat2_rad = lat2 * DEG2RAD_F;
-    float dLon_rad = (lon2 - lon1) * DEG2RAD_F;
+    float latSumRad = (lat1 + lat2) * (DEG2RAD_F * 0.5f);
+    float dx = (lon2 - lon1) * DEG2RAD_F * fast_cosf(latSumRad);
+    float dy = (lat2 - lat1) * DEG2RAD_F;
 
-    // Equirectangular Approximation
-    // x = Differenz Längengrad korrigiert um den Breitengrad
-    // y = Differenz Breitengrad
-    float x = dLon_rad * cosf((lat1_rad + lat2_rad) * 0.5f);
-    float y = lat2_rad - lat1_rad;
-
-    // Distanz = Erdradius * Wurzel(x² + y²)
-    return sqrtf(x * x + y * y) * EARTH_RADIUS_M_F;
+    return sqrtf(dx * dx + dy * dy) * EARTH_RADIUS_M_F;
 }
 
 /****************************************/
 
-static gps_eval_t gps_evaluate_fix(const gps_data_t &data, const gps_state_ctx_t &ctx)
+static gps_eval_t gps_evaluate_fix(const gps_data_t &data,
+                                  const gps_state_ctx_t &ctx)
 {
-	static bool initialized = false;
-	gps_eval_t out = {};
-	float dist = 0, maxDist = 0, dCourse = 0;
+    gps_eval_t out;
+    gps_invalid_reason_t reason;
 
-	auto err = [&](gps_invalid_reason_t r)
-	{
-		switch (r)
-		{
-		case r_FIX ... r_MIN_HDOP:
-			log_w("Eval: %s", _qreason[r]);
-			break;
-		case r_ACCURACY:
-			log_w("Eval: Accuracy %dm", (double)out.accuracy_m);
-			break;
-		case r_JUMPFILTER:
-			log_w("Eval: Acc: %dm Spungfilter kmh: %.1f dist: %.1fm (max:%1.fm)", lround(out.accuracy_m), (double)data.kmh, (double)dist, (double)maxDist);
-			break;
-		case r_COURSE:
-			log_w("Eval: Acc: %dm Kurs %d°", lround(out.accuracy_m), lround(dCourse));
-			break;
-		case r_HDOP_SLOW ... r_HDOP_FAST:
-			log_w("Eval: Acc: %dm, SPEED → HDOP TOO BAD, %.1f kmh, hdop: %.1f", lround(out.accuracy_m), (double)data.kmh, (double)data.hdop);
-			break;
-		default:
-			break;
-		}
-		out.reason = r;
-		out.valid = false;
-		return out;
-	};
+    /* ---- alle Variablen VOR goto ---- */
+    float dist        = 0.0f;
+    float maxDist     = 0.0f;
+    float dCourse     = 0.0f;
+    float jump_ratio  = 0.0f;
 
-	if (!initialized) {
-		initialized = true;
-		out.valid = (data.fix >= 2);
-		return out; //init
-	}
+    /* Qualitätsmetriken */
+    float q_hdop   = 0.0f;
+    float q_jump   = 0.0f;
+    float q_course = 0.0f;
+    float q_sats   = 0.0f;
 
-	/* ==============================
-	   Harte Ausschlusskriterien
-	   ============================== */
+    /* ==============================
+       HDOP → Genauigkeit
+       ============================== */
 
-	if (false && data.fix < 2) // kein 3D-Fix
-		return err(r_FIX);
+    out.accuracy_m = data.hdop * (float)GPS_UERE;
 
-	if (data.satellites < GPS_MIN_SATELLITES) // zu wenig Satelliten
-		return err(r_NUM_SATS);
+    /* ==============================
+       Harte Ausschlusskriterien
+       ============================== */
 
-	if (data.hdop > (float)GPS_MIN_HDOP) // schlechte Geometrie
-		return err(r_MIN_HDOP);
-
-	/* ==============================
-	   HDOP → Genauigkeit
-	   ============================== */
-
-	// Positionsfehler ≈ DOP × Range Error
-	out.accuracy_m = data.hdop * (float)GPS_UERE;
-
-	/* ==============================
-	   Bewegungs-Sprungfilter
-	   ============================== */
-
-	dist = distance_m(data.lat, data.lng, ctx.lastLat, ctx.lastLon);
-	out.dist = dist;
-	// Maximal plausible Strecke: Meter/Sec * dt = Strecke.
-	// Die Geschwindigkeit wird im Epfänger durch Doppler-Messung der Trägerfrequenz berechnet, nicht aus den Positionsdaten.
-	// Daher kann die Geschwindigkeit hier zur Plausibilitätsprüfung verwendet werden.
-	maxDist = data.kmh * data.dt_gps * (1.5f / 3.6f) + 8.0f; // 1.5f → Sicherheitsfaktor (50%), /3.6 : km/h → ms/s), 8.0f: Offset(Meter), Grundrauschen GPS
-
-	if (dist > maxDist)
-		return err(r_JUMPFILTER);
-
-	/* ==============================
-	   Kurs-Konsistenzfilter
-	   ============================== */
-
-	// Kurs nur prüfen und aktualisieren, wenn wir uns wirklich bewegen (> 7 km/h)
-    if (data.kmh > 7.0f) {
-        dCourse = fabsf(data.course - ctx.lastCourse);
-        if (dCourse > 180.0f) dCourse = 360.0f - dCourse;
-
-        // Wenn wir schnell sind (> 20 km/h), darf der Kurs nicht um > 45° springen
-        if (data.kmh > 20.0f && dCourse > 45.0f) return err(r_COURSE);
+    if (data.satellites < 4) {
+        reason = r_NUM_SATS;
+        goto reject;
     }
 
-#if 0
-	/* ==============================
-	   HDOP abhängig von Geschwindigkeit
-	   - die Werte hier müssen noch überarbeitet werden.
-	   ============================== */
+    /* ==============================
+       Bewegungs-Sprungfilter
+       ============================== */
 
-	if (data.kmh < 3.5f && data.hdop > 1.2f)
-		return err(r_HDOP_SLOW);
+    dist     = distance_m(data.lat, data.lng, ctx.lastLat, ctx.lastLon);
+    out.dist = dist;
 
-	if (data.kmh >= 3.5f && data.kmh < 18.0f && data.hdop > 1.5f)
-		return err(r_HDOP_MED);
+    maxDist = data.kmh * data.dt_gps * (1.5f / 3.6f) + 8.0f;
 
-	if (data.kmh >= 18.0f && data.hdop > 2.0f)
-		return err(r_HDOP_FAST);
-#endif
-	/* ==============================
-	   Fix akzeptiert
-	   ============================== */
+    if (dist > maxDist) {
+        reason = r_JUMPFILTER;
+        goto reject;
+    }
 
-	out.valid = true;
-	return out;
+    /* ==============================
+       Kurs (harte Extremgrenze)
+       ============================== */
+
+    if (data.kmh > 7.0f) {
+        dCourse = fabsf(data.course - ctx.lastCourse);
+        if (dCourse > 180.0f)
+            dCourse = 360.0f - dCourse;
+
+        if (data.kmh > 20.0f && dCourse > 90.0f) {
+            reason = r_COURSE;
+            goto reject;
+        }
+    }
+
+    /* ==============================
+       Weiche Qualitätsmetriken
+       ============================== */
+
+    /* --- HDOP --- */
+    if (data.hdop <= 1.2f)
+        q_hdop = 1.0f;
+    else if (data.hdop >= (float)GPS_MIN_HDOP)
+        q_hdop = 0.0f;
+    else
+        q_hdop = 1.0f - (data.hdop - 1.2f) / ((float)GPS_MIN_HDOP - 1.2f);
+
+    /* --- Jump --- */
+    jump_ratio = dist / maxDist;
+
+    if (jump_ratio <= 0.6f)
+        q_jump = 1.0f;
+    else if (jump_ratio >= 1.0f)
+        q_jump = 0.0f;
+    else
+        q_jump = 1.0f - (jump_ratio - 0.6f) / 0.4f;
+
+    /* --- Course --- */
+    if (data.kmh < 7.0f)
+        q_course = 1.0f;
+    else if (dCourse <= 10.0f)
+        q_course = 1.0f;
+    else if (dCourse >= 60.0f)
+        q_course = 0.0f;
+    else
+        q_course = 1.0f - (dCourse - 10.0f) / 50.0f;
+
+    /* --- Satelliten --- */
+    if (data.satellites >= 10)
+        q_sats = 1.0f;
+    else if (data.satellites <= (int)GPS_MIN_SATELLITES)
+        q_sats = 0.0f;
+    else
+        q_sats = (data.satellites - (int)GPS_MIN_SATELLITES) * 0.2f;
+
+    /* ==============================
+       Confidence
+       ============================== */
+
+    out.confidence =
+        0.40f * q_jump +
+        0.25f * q_course +
+        0.20f * q_hdop +
+        0.15f * q_sats;
+
+    /* ==============================
+       Logging
+       ============================== */
+
+    log_i("GPS Eval: conf=%.2f hdop=%.2f(q=%.2f) "
+          "jump=%.2f(q=%.2f) course=%.1f(q=%.2f) sats=%d(q=%.2f)",
+          (double)out.confidence,
+          (double)data.hdop, (double)q_hdop,
+          (double)jump_ratio, (double)q_jump,
+          (double)dCourse, (double)q_course,
+          data.satellites, (double)q_sats);
+
+    /* ==============================
+       Entscheidung
+       ============================== */
+
+    if (out.confidence >= 0.75f) {
+        out.valid  = true;
+        out.reason = r_OK;
+        return out;
+    }
+
+    if (out.confidence >= 0.45f) {
+        out.valid  = true;
+        out.reason = r_ACCURACY;   // „weich akzeptiert“
+        return out;
+    }
+
+    reason = r_ACCURACY;
+
+reject:
+    log_w("GPS Reject: %s conf=%.2f hdop=%.2f dist=%.1f",
+          _qreason[reason],
+          (double)out.confidence,
+          (double)data.hdop,
+          (double)dist);
+
+    out.valid  = false;
+    out.reason = reason;
+    return out;
 }
+
+
 
 /****************************************/
 bool gps_state_update(const gps_data_t &data, gps_state_ctx_t &ctx)
@@ -259,7 +311,7 @@ bool gps_state_update(const gps_data_t &data, gps_state_ctx_t &ctx)
     /* ==============================
         Logging-Entscheidung & Motion
        ============================== */
-    const bool ok = (ctx.state == GPS_STATE_LOCKED);
+    const bool ok = (ctx.state == GPS_STATE_LOCKED || ctx.state == GPS_STATE_DEGRADED);
     ctx.mayFlush = false;
 
     if (ok)
@@ -269,7 +321,9 @@ bool gps_state_update(const gps_data_t &data, gps_state_ctx_t &ctx)
         /* --- Bewegungserkennung (Motion State) --- */
         if (ctx.motion_state == GPS_STOPPED)
         {
-            if (data.kmh > SPEED_MOVE_KMH && eval.dist > DIST_MOVE_M)
+            if (data.kmh > SPEED_MOVE_KMH &&
+				eval.dist > DIST_MOVE_M &&
+				eval.accuracy_m < 10.0f) //<10m
             {
                 if (++ctx.moveCount >= MOVE_CONFIRM_CNT)
                 {
@@ -279,9 +333,11 @@ bool gps_state_update(const gps_data_t &data, gps_state_ctx_t &ctx)
             }
             else ctx.moveCount = 0;
         }
-        else // MOVING
+        else  [[likely]] // MOVING
         {
-            if (data.kmh < SPEED_STOP_KMH && eval.dist < DIST_STOP_M)
+            if (data.kmh < SPEED_STOP_KMH &&
+				eval.dist < DIST_STOP_M &&
+				eval.accuracy_m < 10.0f)
             {
                 if (++ctx.stopCount >= STOP_CONFIRM_CNT)
                 {

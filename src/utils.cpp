@@ -4,37 +4,6 @@
 extern SemaphoreHandle_t logfile_sem;
 std::vector<wifiCredentials_t> wifiCreds(WIFI_MAX_NETWORKS);
 
-void onWiFiEvent(arduino_event_id_t event)
-{
-	bool triggerMDNS = false;
-
-	switch (event)
-	{
-	case ARDUINO_EVENT_WIFI_STA_GOT_IP:
-		log_i("Verbunden! IP: %s", WiFi.localIP().toString().c_str());
-		triggerMDNS = true;
-		break;
-
-	case ARDUINO_EVENT_WIFI_AP_START:
-		triggerMDNS = true;
-		break;
-
-	default:
-		break;
-	}
-
-	// mDNS handling
-	if (triggerMDNS && MDNS.begin(HOSTNAME))
-	{
-		static bool servicesAdded = false;
-		if (!servicesAdded)
-		{
-			servicesAdded = true;
-			MDNS.addService("http", "tcp", 80);
-		}
-	}
-}
-
 void boost(const bool fast)
 {
 #if !defined(ENABLE_HEAT_REDUCTION) || !ENABLE_HEAT_REDUCTION
@@ -64,6 +33,42 @@ void boost(const bool fast)
 		setCpuFrequencyMhz(CPU_FREQ_IDLE);
 		WiFi.setSleep(true);
 		isFast = false;
+	}
+}
+
+/****************************************************************************************************************************/
+#pragma GCC push_options
+#pragma GCC optimize("Os")
+/****************************************************************************************************************************/
+
+void onWiFiEvent(arduino_event_id_t event)
+{
+	bool triggerMDNS = false;
+
+	switch (event)
+	{
+	case ARDUINO_EVENT_WIFI_STA_GOT_IP:
+		log_i("Verbunden! IP: %s", WiFi.localIP().toString().c_str());
+		triggerMDNS = true;
+		break;
+
+	case ARDUINO_EVENT_WIFI_AP_START:
+		triggerMDNS = true;
+		break;
+
+	default:
+		break;
+	}
+
+	// mDNS handling
+	if (triggerMDNS && MDNS.begin(HOSTNAME))
+	{
+		static bool servicesAdded = false;
+		if (!servicesAdded)
+		{
+			servicesAdded = true;
+			MDNS.addService("http", "tcp", 80);
+		}
 	}
 }
 
@@ -198,6 +203,7 @@ size_t readFileList(const char *fileext)
 
 size_t deleteAllFiles()
 {
+	log_i("Del all files");
 	size_t count = 0;
 	char path[LEN_FILENAME];
 	xSemaphoreTake(logfile_sem, portMAX_DELAY);
@@ -239,8 +245,27 @@ size_t deleteFile(const time_t id)
 }
 
 /****************************************************************************************************************************/
+/*
+ - Löscht alle leere Logfiles
+ */
+static void delEmptyFiles() {
+    File root = LittleFS.open("/");
+    while (File f = root.openNextFile()) {
+        if (!f.isDirectory() && f.size() == 0) {
+            const char* path = f.path();
+            f.close();
+            LittleFS.remove(path);
+        }
+    }
+}
+
+/*
+ - Löscht älteste Dateien bis 64KB frei sind.
+ */
 void cleanupStorage()
 {
+	delEmptyFiles();
+
 	constexpr size_t MIN_FREE = 64 * 1024; // 64 KB reserve
 	const size_t preLen = strlen(FILE_PREFIX);
 
@@ -280,17 +305,4 @@ void cleanupStorage()
 	}
 }
 
-/****************************************************************************************************************************/
-// Fehlerbehandlung: Gibt eine Fehlermeldung aus und bleibt in einer Endlosschleife
-void error(const char *msg)
-{
-	for (;;)
-	{
-		log_e("Fehler: %s", msg);
-		for (int i = 0; i < 10; ++i)
-		{
-			TOGGLELED();
-			delay(100);
-		}
-	}
-}
+#pragma GCC pop_options
