@@ -8,6 +8,5 @@
 include/credentials.h
 test
 info
-lib
 data/*.vic
 data/*.bin

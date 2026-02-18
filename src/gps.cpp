@@ -163,8 +163,7 @@ static gps_eval_t gps_evaluate_fix(const gps_data_t &data,
        Logging
        ============================== */
 
-    log_i("GPS Eval: conf=%.2f hdop=%.2f(q=%.2f) "
-          "jump=%.2f(q=%.2f) course=%.1f(q=%.2f) sats=%d(q=%.2f)",
+    log_d("GPS Eval: conf=%.2f hdop=%.2f(q=%.2f) jump=%.2f(q=%.2f) course=%.1f(q=%.2f) sats=%d(q=%.2f)",
           (double)out.confidence,
           (double)data.hdop, (double)out.q_hdop,
           (double)jump_ratio, (double)out.q_jump,

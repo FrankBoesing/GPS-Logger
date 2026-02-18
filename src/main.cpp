@@ -12,7 +12,6 @@ const size_t &fsTotalBytes = _fsTotalBytes; // make it read-only
 ulong firstFix = 0;
 gps_state_ctx_t gps_state = {};
 
-
 /****************************************************************************************************************************/
 /****************************************************************************************************************************/
 /****************************************************************************************************************************/
@@ -219,7 +218,9 @@ void setup()
 
 	WiFi.useStaticBuffers(true);
 
-	Serial.begin();
+	Serial.begin(115200);
+	initRamLogging();
+
 	GPSSerial.setRxBufferSize(512);
 	GPSSerial.begin(GPS_BAUD, SERIAL_8N1, GPS_RX_PIN, GPS_TX_PIN);
 	while (GPSSerial.read() >= 0)
