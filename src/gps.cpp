@@ -18,9 +18,8 @@ typedef enum : uint8_t
 } gps_invalid_reason_t;
 
 typedef struct {
-    bool  valid;
     float accuracy_m;
-    float dist;
+    float dist_m;
 
     float confidence;   // 0..1
     float q_hdop;
@@ -28,7 +27,9 @@ typedef struct {
     float q_course;
     float q_sats;
 
-    gps_invalid_reason_t reason;
+    bool  valid;
+	gps_invalid_reason_t reason;
+
 } gps_eval_t;
 
 static constexpr const char *_qreason[gps_invalid_reason_t::r_COUNT] = {"", "NO FIX", "CNT SATS", "MIN HDOP", "ACCURACY", "JUMPFILTER", "COURSE", "HDOP SLOW", "HDOP MED", "HDOP FAST"};
@@ -64,7 +65,6 @@ static gps_eval_t gps_evaluate_fix(const gps_data_t &data,
                                   const gps_state_ctx_t &ctx)
 {
     gps_eval_t out = {};
-    gps_invalid_reason_t reason;
     float maxDist, dCourse, jump_ratio;
 
     /* ==============================
@@ -78,7 +78,7 @@ static gps_eval_t gps_evaluate_fix(const gps_data_t &data,
        ============================== */
 
     if (data.satellites < 4) {
-        reason = r_NUM_SATS;
+        out.reason = r_NUM_SATS;
         goto reject;
     }
 
@@ -86,11 +86,11 @@ static gps_eval_t gps_evaluate_fix(const gps_data_t &data,
        Bewegungs-Sprungfilter
        ============================== */
 
-    out.dist = distance_m(data.lat, data.lng, ctx.lastLat, ctx.lastLon);
+    out.dist_m = distance_m(data.lat, data.lng, ctx.lastLat, ctx.lastLon);
     maxDist = data.kmh * data.dt_gps * (1.5f / 3.6f) + 8.0f;
 
-    if (out.dist > maxDist) {
-        reason = r_JUMPFILTER;
+    if (out.dist_m > maxDist) {
+        out.reason = r_JUMPFILTER;
         goto reject;
     }
 
@@ -104,7 +104,7 @@ static gps_eval_t gps_evaluate_fix(const gps_data_t &data,
             dCourse = 360.0f - dCourse;
 
         if (data.kmh > 20.0f && dCourse > 90.0f) {
-            reason = r_COURSE;
+            out.reason = r_COURSE;
             goto reject;
         }
     } else dCourse = 0.0f;
@@ -122,7 +122,7 @@ static gps_eval_t gps_evaluate_fix(const gps_data_t &data,
         out.q_hdop = 1.0f - (data.hdop - 1.2f) * (1.0f / ((float)GPS_MIN_HDOP - 1.2f));
 
     /* --- Jump --- */
-    jump_ratio = out.dist / maxDist;
+    jump_ratio = out.dist_m / maxDist;
 
     if (jump_ratio <= 0.6f)
         out.q_jump = 1.0f;
@@ -187,17 +187,16 @@ static gps_eval_t gps_evaluate_fix(const gps_data_t &data,
         return out;
     }
 
-    reason = r_ACCURACY;
+    out.reason = r_ACCURACY;
 
 reject:
     log_w("GPS Reject: %s conf=%.2f hdop=%.2f dist=%.1f",
-          _qreason[reason],
+          _qreason[out.reason],
           (double)out.confidence,
           (double)data.hdop,
-          (double)out.dist);
+          (double)out.dist_m);
 
     out.valid  = false;
-    out.reason = reason;
     return out;
 }
 
@@ -307,7 +306,7 @@ bool gps_state_update(const gps_data_t &data, gps_state_ctx_t &ctx)
         if (ctx.motion_state == GPS_STOPPED)
         {
             if (data.kmh > SPEED_MOVE_KMH &&
-				eval.dist > DIST_MOVE_M &&
+				eval.dist_m > DIST_MOVE_M &&
 				eval.accuracy_m < 10.0f) //<10m
             {
                 if (++ctx.moveCount >= MOVE_CONFIRM_CNT)
@@ -321,7 +320,7 @@ bool gps_state_update(const gps_data_t &data, gps_state_ctx_t &ctx)
         else  [[likely]] // MOVING
         {
             if (data.kmh < SPEED_STOP_KMH &&
-				eval.dist < DIST_STOP_M &&
+				eval.dist_m < DIST_STOP_M &&
 				eval.accuracy_m < 10.0f) //<10m
             {
                 if (++ctx.stopCount >= STOP_CONFIRM_CNT)
