@@ -17,9 +17,6 @@ typedef enum : uint8_t
 	r_COUNT
 } gps_invalid_reason_t;
 
-static constexpr const char *_qreason[gps_invalid_reason_t::r_COUNT] = {"", "NO FIX", "CNT SATS", "MIN HDOP", "ACCURACY", "JUMPFILTER", "COURSE", "HDOP SLOW", "HDOP MED", "HDOP FAST"};
-static constexpr const char *_state[GPS_STATE_COUNT] = {"INIT", "ACQUIRE", "LOCK", "DEGRADED", "LOST"};
-
 typedef struct {
     bool  valid;
     float accuracy_m;
@@ -33,6 +30,9 @@ typedef struct {
 
     gps_invalid_reason_t reason;
 } gps_eval_t;
+
+static constexpr const char *_qreason[gps_invalid_reason_t::r_COUNT] = {"", "NO FIX", "CNT SATS", "MIN HDOP", "ACCURACY", "JUMPFILTER", "COURSE", "HDOP SLOW", "HDOP MED", "HDOP FAST"};
+static constexpr const char *_state[GPS_STATE_COUNT] = {"INIT", "ACQUIRE", "LOCK", "DEGRADED", "LOST"};
 
 /****************************************/
 
@@ -63,26 +63,15 @@ static float distance_m(float lat1, float lon1, float lat2, float lon2)
 static gps_eval_t gps_evaluate_fix(const gps_data_t &data,
                                   const gps_state_ctx_t &ctx)
 {
-    gps_eval_t out;
+    gps_eval_t out = {};
     gps_invalid_reason_t reason;
-
-    /* ---- alle Variablen VOR goto ---- */
-    float dist        = 0.0f;
-    float maxDist     = 0.0f;
-    float dCourse     = 0.0f;
-    float jump_ratio  = 0.0f;
-
-    /* Qualitätsmetriken */
-    float q_hdop   = 0.0f;
-    float q_jump   = 0.0f;
-    float q_course = 0.0f;
-    float q_sats   = 0.0f;
+    float maxDist, dCourse, jump_ratio;
 
     /* ==============================
        HDOP → Genauigkeit
        ============================== */
 
-    out.accuracy_m = data.hdop * (float)GPS_UERE;
+    out.accuracy_m = data.hdop * GPS_UERE;
 
     /* ==============================
        Harte Ausschlusskriterien
@@ -97,12 +86,10 @@ static gps_eval_t gps_evaluate_fix(const gps_data_t &data,
        Bewegungs-Sprungfilter
        ============================== */
 
-    dist     = distance_m(data.lat, data.lng, ctx.lastLat, ctx.lastLon);
-    out.dist = dist;
-
+    out.dist = distance_m(data.lat, data.lng, ctx.lastLat, ctx.lastLon);
     maxDist = data.kmh * data.dt_gps * (1.5f / 3.6f) + 8.0f;
 
-    if (dist > maxDist) {
+    if (out.dist > maxDist) {
         reason = r_JUMPFILTER;
         goto reject;
     }
@@ -120,7 +107,7 @@ static gps_eval_t gps_evaluate_fix(const gps_data_t &data,
             reason = r_COURSE;
             goto reject;
         }
-    }
+    } else dCourse = 0.0f;
 
     /* ==============================
        Weiche Qualitätsmetriken
@@ -128,49 +115,49 @@ static gps_eval_t gps_evaluate_fix(const gps_data_t &data,
 
     /* --- HDOP --- */
     if (data.hdop <= 1.2f)
-        q_hdop = 1.0f;
+        out.q_hdop = 1.0f;
     else if (data.hdop >= (float)GPS_MIN_HDOP)
-        q_hdop = 0.0f;
+        out.q_hdop = 0.0f;
     else
-        q_hdop = 1.0f - (data.hdop - 1.2f) / ((float)GPS_MIN_HDOP - 1.2f);
+        out.q_hdop = 1.0f - (data.hdop - 1.2f) * (1.0f / ((float)GPS_MIN_HDOP - 1.2f));
 
     /* --- Jump --- */
-    jump_ratio = dist / maxDist;
+    jump_ratio = out.dist / maxDist;
 
     if (jump_ratio <= 0.6f)
-        q_jump = 1.0f;
+        out.q_jump = 1.0f;
     else if (jump_ratio >= 1.0f)
-        q_jump = 0.0f;
+        out.q_jump = 0.0f;
     else
-        q_jump = 1.0f - (jump_ratio - 0.6f) / 0.4f;
+        out.q_jump = 1.0f - (jump_ratio - 0.6f) * (1.0f / 0.4f);
 
     /* --- Course --- */
     if (data.kmh < 7.0f)
-        q_course = 1.0f;
+        out.q_course = 1.0f;
     else if (dCourse <= 10.0f)
-        q_course = 1.0f;
+        out.q_course = 1.0f;
     else if (dCourse >= 60.0f)
-        q_course = 0.0f;
+        out.q_course = 0.0f;
     else
-        q_course = 1.0f - (dCourse - 10.0f) / 50.0f;
+        out.q_course = 1.0f - (dCourse - 10.0f) * (1.0f / 50.0f);
 
     /* --- Satelliten --- */
     if (data.satellites >= 10)
-        q_sats = 1.0f;
+        out.q_sats = 1.0f;
     else if (data.satellites <= (int)GPS_MIN_SATELLITES)
-        q_sats = 0.0f;
+        out.q_sats = 0.0f;
     else
-        q_sats = (data.satellites - (int)GPS_MIN_SATELLITES) * 0.2f;
+        out.q_sats = (data.satellites - (int)GPS_MIN_SATELLITES) * 0.2f;
 
     /* ==============================
        Confidence
        ============================== */
 
     out.confidence =
-        0.40f * q_jump +
-        0.25f * q_course +
-        0.20f * q_hdop +
-        0.15f * q_sats;
+        0.40f * out.q_jump +
+        0.25f * out.q_course +
+        0.20f * out.q_hdop +
+        0.15f * out.q_sats;
 
     /* ==============================
        Logging
@@ -179,10 +166,10 @@ static gps_eval_t gps_evaluate_fix(const gps_data_t &data,
     log_i("GPS Eval: conf=%.2f hdop=%.2f(q=%.2f) "
           "jump=%.2f(q=%.2f) course=%.1f(q=%.2f) sats=%d(q=%.2f)",
           (double)out.confidence,
-          (double)data.hdop, (double)q_hdop,
-          (double)jump_ratio, (double)q_jump,
-          (double)dCourse, (double)q_course,
-          data.satellites, (double)q_sats);
+          (double)data.hdop, (double)out.q_hdop,
+          (double)jump_ratio, (double)out.q_jump,
+          (double)dCourse, (double)out.q_course,
+          data.satellites, (double)out.q_sats);
 
     /* ==============================
        Entscheidung
@@ -207,14 +194,12 @@ reject:
           _qreason[reason],
           (double)out.confidence,
           (double)data.hdop,
-          (double)dist);
+          (double)out.dist);
 
     out.valid  = false;
     out.reason = reason;
     return out;
 }
-
-
 
 /****************************************/
 bool gps_state_update(const gps_data_t &data, gps_state_ctx_t &ctx)
@@ -337,7 +322,7 @@ bool gps_state_update(const gps_data_t &data, gps_state_ctx_t &ctx)
         {
             if (data.kmh < SPEED_STOP_KMH &&
 				eval.dist < DIST_STOP_M &&
-				eval.accuracy_m < 10.0f)
+				eval.accuracy_m < 10.0f) //<10m
             {
                 if (++ctx.stopCount >= STOP_CONFIRM_CNT)
                 {
@@ -352,7 +337,7 @@ bool gps_state_update(const gps_data_t &data, gps_state_ctx_t &ctx)
         ctx.mayFlush = (ctx.motion_state == GPS_STOPPED) && (lastMotionState == GPS_MOVING);
     }
 
-    log_d("%s %dm Q: %s, B: %s",
+    log_i("%s %dm Q: %s, B: %s",
           eval.valid ? "Gültig" : "Ungültig",
           lround(ctx.accuracy_m),
           _state[ctx.state],
