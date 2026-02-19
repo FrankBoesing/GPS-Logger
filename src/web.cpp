@@ -1,7 +1,5 @@
 #include "includes.h"
-
 #include <ArduinoJson.h>
-#include <Preferences.h>
 
 static AsyncWebServer server(80);
 static AsyncEventSource events("/events");

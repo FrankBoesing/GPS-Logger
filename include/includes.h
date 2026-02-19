@@ -7,7 +7,6 @@
 #include "sortedStaticArray.hpp"
 
 #include <Arduino.h>
-#include <mylog.h>
 #include <WiFi.h>
 #include <ESPmDNS.h>
 #include <LittleFS.h>
@@ -15,6 +14,7 @@
 #include <time.h>
 #include <stdlib.h>
 
+#include <mylog.h>
 #include "config.h"
 #include "logfile.h"
 #include "utils.h"

@@ -4,6 +4,7 @@
 extern SemaphoreHandle_t logfile_sem;
 std::vector<wifiCredentials_t> wifiCreds(WIFI_MAX_NETWORKS);
 
+[[gnu::optimize("O2")]]
 void boost(const bool fast)
 {
 #if !defined(ENABLE_HEAT_REDUCTION) || !ENABLE_HEAT_REDUCTION
@@ -37,8 +38,6 @@ void boost(const bool fast)
 }
 
 /****************************************************************************************************************************/
-#pragma GCC push_options
-#pragma GCC optimize("Os")
 /****************************************************************************************************************************/
 
 void onWiFiEvent(arduino_event_id_t event)
@@ -304,5 +303,3 @@ void cleanupStorage()
 			return;
 	}
 }
-
-#pragma GCC pop_options

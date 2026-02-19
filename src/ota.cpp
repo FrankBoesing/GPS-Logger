@@ -5,9 +5,6 @@
 #include "includes.h"
 #include <ArduinoOTA.h>
 
-#pragma GCC push_options
-#pragma GCC optimize ("Os")
-
 void initOTA()
 {
     ArduinoOTA.setHostname(HOSTNAME);

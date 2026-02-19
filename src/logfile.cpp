@@ -174,6 +174,8 @@ void logfileW::periodicFlush()
 		flush();
 }
 /****************************************************************************************************************************/
+#pragma GCC push_options
+#pragma GCC optimize ("O2")
 
 bool logfileR::readVarUint(uint32_t &out)
 {
@@ -247,6 +249,8 @@ bool logfileR::readPoint(GPSPoint_t &p) {
     pointsRead++;
     return true;
 }
+
+#pragma GCC pop_options
 
 /*
 	Liest Anzahl der aufgezeichneten Punkte, und Zeitpunkt des ersten und letzen Trackpoints

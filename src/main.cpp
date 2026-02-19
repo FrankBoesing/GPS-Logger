@@ -1,7 +1,7 @@
 #include "includes.h"
+#include "ota.h"
 #include <WiFiMulti.h>
 #include <TinyGPSPlus.h>
-#include "ota.h"
 
 WiFiMulti wifiMulti;
 std::atomic<log_mode_t> logMode = NOLOG;
@@ -170,10 +170,6 @@ static void saveToGPSLog(TinyGPSPlus &gps, const time_t &utc) // Wird sekündlic
 
 /****************************************************************************************************************************/
 /****************************************************************************************************************************/
-
-#pragma GCC push_options
-#pragma GCC optimize("Os")
-
 /****************************************************************************************************************************/
 static void wifiMulti_run()
 {
@@ -221,7 +217,8 @@ void setup()
 
 	Serial.begin(115200);
 	initRamLogging();
-
+	delay(50);
+	
 	GPSSerial.setRxBufferSize(512);
 	GPSSerial.begin(GPS_BAUD, SERIAL_8N1, GPS_RX_PIN, GPS_TX_PIN);
 	while (GPSSerial.read() >= 0)
@@ -243,7 +240,7 @@ void setup()
 	esp_wifi_set_max_tx_power((int8_t)((float)WiFI_MAX_POWER * 4.0f));
 
 	WiFi.softAP(AP_SSID, AP_PASS, 6);
-	delay(100); // Funktioniert besser mit delay.
+	delay(100);
 	loadPrefs();
 
 	if (wifiCreds.size())
@@ -253,18 +250,20 @@ void setup()
 		wifiMulti.run();
 	}
 	WiFi.setAutoReconnect(true);
+	delay(25);
 
 	initLogfile();
 	setupWebServer();
-
-	if (logMode == LOGAUTOSTART)
-		logCmd = STARTNOW;
+	delay(5);
 
 	cleanupStorage();
 	readFileList(FILE_SUFFIX);
+	delay(5);
 
 	initOTA();
 	initTelnetLogging();
+	delay(5);
+
 	logi("---- Access Point  ----");
 	logi("SSID       : %s", AP_SSID);
 	logi("AP-Passwort: %s", AP_PASS);
@@ -274,11 +273,14 @@ void setup()
 	if (!GPSSerial.find("\n"))
 		error("GPS nicht verbunden.");
 	hwinit();
+	delay(5);
+
+	if (logMode == LOGAUTOSTART)
+		logCmd = STARTNOW;
 
 	logi("Setup abgeschlossen.");
 
 	digitalWrite(LED, LOW);
-	yield();
 }
 
 /****************************************************************************************************************************/
@@ -287,11 +289,8 @@ void loop()
 {
 	wifiMulti_run();
 	handleOTA();
-	if (!error())
-		{
-			handleGPSData();
-			boost();
-		}
+	error();
+	delay(10);
+	handleGPSData();
+	boost();
 }
-
-#pragma GCC pop_options
