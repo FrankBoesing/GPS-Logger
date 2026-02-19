@@ -15,7 +15,7 @@
 
 typedef std::function<void(void *, AsyncClient *)> ConnHandler;
 typedef std::function<void(AsyncClient *)> DisconnHandler;
-typedef std::function<void(std::string)> IncomingDataHandler;
+typedef std::function<void(const char *)> IncomingDataHandler;
 
 class AsyncTelnet
 {
@@ -48,7 +48,9 @@ protected:
 
 	ConnHandler on_connect = NULL;
 	DisconnHandler on_disconnect = NULL;
+#if HANDLE_INCOMMING_DATA
 	IncomingDataHandler on_incoming_data = NULL;
+#endif
 };
 
 #endif
