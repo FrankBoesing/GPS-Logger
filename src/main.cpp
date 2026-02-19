@@ -1,6 +1,7 @@
 #include "includes.h"
 #include <WiFiMulti.h>
 #include <TinyGPSPlus.h>
+#include "ota.h"
 
 WiFiMulti wifiMulti;
 std::atomic<log_mode_t> logMode = NOLOG;
@@ -262,6 +263,7 @@ void setup()
 	cleanupStorage();
 	readFileList(FILE_SUFFIX);
 
+	initOTA();
 	initTelnetLogging();
 	logi("---- Access Point  ----");
 	logi("SSID       : %s", AP_SSID);
@@ -284,6 +286,7 @@ void setup()
 void loop()
 {
 	wifiMulti_run();
+	handleOTA();
 	if (!error())
 		{
 			handleGPSData();
