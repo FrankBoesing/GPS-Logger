@@ -2,6 +2,9 @@
 #include <stdarg.h>
 #include "mylog.h"
 
+#pragma GCC push_options
+#pragma GCC optimize("Os")
+
 #define LOG_MAGIC_NUMBER 0xDEADBEEF // Damit wir wissen, dass die Logs echt sind
 
 RTC_NOINIT_ATTR char ram_log_buffer[RAM_LOG_SIZE];
@@ -36,7 +39,7 @@ void getFullBuffer(void (*handler)(const char *data, size_t len))
 
 int custom_ram_printf(const char *fmt, ...)
 {
-	char loc_buf[128]; // Temporärer Puffer für eine Zeile
+	char loc_buf[160]; // Temporärer Puffer für eine Zeile
 	va_list arg;
 	va_start(arg, fmt);
 	const int len = vsnprintf(loc_buf, sizeof(loc_buf), fmt, arg);
@@ -44,14 +47,9 @@ int custom_ram_printf(const char *fmt, ...)
 
 	if (len > 0)
 	{
-		// 1. In den RAM-Ringpuffer kopieren
-		for (int i = 0; i < len; i++)
-		{
-			ram_log_buffer[ram_log_idx] = loc_buf[i];
-			ram_log_idx = (ram_log_idx + 1) % RAM_LOG_SIZE;
-			// Puffer terminieren (optional für einfaches Drucken)
-			ram_log_buffer[ram_log_idx] = '\0';
-		}
+		// 1. In Serial ausgeben
+		if (Serial)
+			Serial.print(loc_buf);
 
 		// 2. An das Interface senden (z.B. Telnet)
 		if (external_output != NULL)
@@ -59,8 +57,25 @@ int custom_ram_printf(const char *fmt, ...)
 			external_output(loc_buf);
 		}
 
-		// 3. In Serial ausgeben
-		Serial.print(loc_buf);
+		// 3. In den RAM-Ringpuffer kopieren
+		if (len > 0 && len < RAM_LOG_SIZE)
+		{
+			int space_at_end = RAM_LOG_SIZE - ram_log_idx;
+			if (len <= space_at_end)
+			{
+				// Passt am Stück rein
+				memcpy(&ram_log_buffer[ram_log_idx], loc_buf, len);
+				ram_log_idx = (ram_log_idx + len) % RAM_LOG_SIZE;
+			}
+			else
+			{
+				// Muss geteilt werden: Teil 1 ans Ende, Teil 2 an den Anfang
+				memcpy(&ram_log_buffer[ram_log_idx], loc_buf, space_at_end);
+				memcpy(&ram_log_buffer[0], &loc_buf[space_at_end], len - space_at_end);
+				ram_log_idx = len - space_at_end;
+			}
+			ram_log_buffer[ram_log_idx] = '\0';
+		}
 	}
 	return len;
 }
@@ -92,8 +107,10 @@ void initRamLogging()
 	else
 	{
 		// Alte Logs ausgeben, da sie einen Reset überlebt haben.
-		Serial.println("--- ALTE LOGS GEFUNDEN (PRE-RESET) ---");
+		//Serial.println("--- ALTE LOGS GEFUNDEN (PRE-RESET) ---");
 		dumpRamLog();
 		clearRamLog();
 	}
 }
+
+#pragma GCC pop_options

@@ -1,6 +1,7 @@
 #include "gps.h"
 #include "gps_hw.h"
 #include "config.h"
+#include "mylog.h"
 
 typedef enum : uint8_t
 {
@@ -163,7 +164,7 @@ static gps_eval_t gps_evaluate_fix(const gps_data_t &data,
        Logging
        ============================== */
 
-    log_d("GPS Eval: conf=%.2f hdop=%.2f(q=%.2f) jump=%.2f(q=%.2f) course=%.1f(q=%.2f) sats=%d(q=%.2f)",
+    logd("GPS Eval: conf=%.2f hdop=%.2f(q=%.2f) jump=%.2f(q=%.2f) course=%.1f(q=%.2f) sats=%d(q=%.2f)",
           (double)out.confidence,
           (double)data.hdop, (double)out.q_hdop,
           (double)jump_ratio, (double)out.q_jump,
@@ -189,7 +190,7 @@ static gps_eval_t gps_evaluate_fix(const gps_data_t &data,
     out.reason = r_ACCURACY;
 
 reject:
-    log_w("GPS Reject: %s conf=%.2f hdop=%.2f dist=%.1f",
+    logw("GPS Reject: %s conf=%.2f hdop=%.2f dist=%.1f",
           _qreason[out.reason],
           (double)out.confidence,
           (double)data.hdop,
@@ -335,7 +336,7 @@ bool gps_state_update(const gps_data_t &data, gps_state_ctx_t &ctx)
         ctx.mayFlush = (ctx.motion_state == GPS_STOPPED) && (lastMotionState == GPS_MOVING);
     }
 
-    log_i("%s %dm Q: %s, B: %s",
+    logi("%s %dm Q: %s, B: %s",
           eval.valid ? "Gültig" : "Ungültig",
           lround(ctx.accuracy_m),
           _state[ctx.state],

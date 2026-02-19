@@ -42,13 +42,13 @@ static void sendUBXCommand(const uint8_t *cmd, const size_t size)
 
 void hwinit()
 {
-	log_v("GPS HW init.");
+	logv("GPS HW init.");
 
 	if (0) //  Warmstart. Eigentlich nicht notwendig. Setzt die Konfig auch nicht zurück.
 	{
 		constexpr uint8_t CFG_RST[] = {0x06, 0x04, 0x04, 0x00, 0x01, 0x00, 0x09};
 		sendUBXCommand(CFG_RST, sizeof(CFG_RST));
-		log_i("Ublox Warmstart");
+		logi("Ublox Warmstart");
 		delay(500);
 	}
 

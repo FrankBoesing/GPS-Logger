@@ -40,7 +40,7 @@ void logfileW::open(const time_t time)
 		{
 			append = true;
 			id2filename(e.id, filename, sizeof(filename));
-			log_i("Füge an Logfile an. Alter: %llds", time - e.lastWrite);
+			logi("Füge an Logfile an. Alter: %llds", time - e.lastWrite);
 		}
 	}
 
@@ -54,7 +54,7 @@ void logfileW::open(const time_t time)
 	xSemaphoreGive(logfile_sem);
 
 	uiSendJson(); // UI über neue Datei benachrichtigen
-	log_i("Logfile: %s", filename);
+	logi("Logfile: %s", filename);
 }
 
 void logfileW::close() {
@@ -158,7 +158,7 @@ void  logfileW::_flush_unlocked() {
     pointsWritten += pointsInFileCache;
     pointsInFileCache = 0;
 
-	log_d("Points written: %d", pointsWritten);
+	logd("Points written: %d", pointsWritten);
 
 }
 
@@ -268,6 +268,6 @@ size_t logfileR::getFileInfo(GPSPoint_t &firstp, GPSPoint_t &lastp)
 	while (readPoint(lastp))
 		;
 
-	// log_i("%s: #%u %llu, %llu (%u ms)", path, pts, firstp.time, lastp.time, (micros() - m) / 1000);
+	// logi("%s: #%u %llu, %llu (%u ms)", path, pts, firstp.time, lastp.time, (micros() - m) / 1000);
 	return pointsRead;
 }

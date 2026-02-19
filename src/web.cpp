@@ -86,7 +86,7 @@ void uiSendJson(const bool fileList, const bool wifiCredentials, const bool stat
 
 	auto written = serializeJson(doc, JsonBuf, sizeof(JsonBuf));
 	if (written >= sizeof(JsonBuf) - 1)
-		log_w("Json Buffer zu klein!");
+		logw("Json Buffer zu klein!");
 
 	events.send(JsonBuf, "message", ++sseId);
 	yield();
@@ -327,10 +327,10 @@ OPTSIZE void setupWebServer()
 						client->send("{}", "message");
 						yield();
 						uiSendJson(true, true, true);
-						log_i("SSE client connected"); });
+						logi("SSE client connected"); });
 
 	events.onDisconnect([](const auto *cb)
-						{ log_v("SSE Client Disconnect"); });
+						{ logv("SSE Client Disconnect"); });
 
 	server.addHandler(&events);
 	server.begin();

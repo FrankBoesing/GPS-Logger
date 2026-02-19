@@ -45,7 +45,7 @@ static void timeFromGPS(TinyGPSPlus &gps, time_t &utc)
 		tv.tv_usec = gps.time.centisecond() * 10000; // 1/100 s → µs
 		settimeofday(&tv, NULL);
 		lastSystemTimeSync = t;
-		log_d("Systemzeit von GPS gesetzt.");
+		logd("Systemzeit von GPS gesetzt.");
 	}
 
 	utc = t;
@@ -105,7 +105,7 @@ static void startStop(const time_t &utc)
 		if (cmd == STARTNOW ||					 // Startkommando (ui Button)
 			(logMode == LOGAUTOSTART && booted)) // Start nach Boot (1. Fix)
 		{
-			log_d("Start log");
+			logd("Start log");
 			booted = false;
 			logfile.open(utc);
 			yield();
@@ -163,7 +163,7 @@ static void saveToGPSLog(TinyGPSPlus &gps, const time_t &utc) // Wird sekündlic
 	}
 
 #if TIME_GPS_HANDLING
-	log_i("GPS handling: %u ms", (micros() - m) / 1000);
+	logi("GPS handling: %u ms", (micros() - m) / 1000);
 #endif
 }
 
@@ -203,7 +203,7 @@ static bool error(const char *msg = nullptr)
 		{
 			t = m;
 			digitalWrite(LED, !digitalRead(LED) );
-			log_e("%s", err);
+			loge("%s", err);
 		}
 		return true;
 	}
@@ -262,17 +262,18 @@ void setup()
 	cleanupStorage();
 	readFileList(FILE_SUFFIX);
 
-	log_i("--- Access Point Informationen ---");
-	log_i("SSID       : %s", AP_SSID);
-	log_i("AP-Passwort: %s", AP_PASS);
-	log_i("AP-IP      : %s", WiFi.softAPIP().toString().c_str());
-	log_i("-----------------------\n");
+	initTelnetLogging();
+	logi("---- Access Point  ----");
+	logi("SSID       : %s", AP_SSID);
+	logi("AP-Passwort: %s", AP_PASS);
+	logi("AP-IP      : %s", WiFi.softAPIP().toString().c_str());
+	logi("-----------------------");
 
 	if (!GPSSerial.find("\n"))
 		error("GPS nicht verbunden.");
 	hwinit();
 
-	log_i("Setup abgeschlossen.");
+	logi("Setup abgeschlossen.");
 
 	digitalWrite(LED, LOW);
 	yield();

@@ -48,7 +48,7 @@ void onWiFiEvent(arduino_event_id_t event)
 	switch (event)
 	{
 	case ARDUINO_EVENT_WIFI_STA_GOT_IP:
-		log_i("Verbunden! IP: %s", WiFi.localIP().toString().c_str());
+		logi("Verbunden! IP: %s", WiFi.localIP().toString().c_str());
 		triggerMDNS = true;
 		break;
 
@@ -89,7 +89,7 @@ void loadPrefs()
 		size_t loadedBytes = pref.getBytes("wifi_data", wifiCreds.data(), count * sizeof(wifiCredentials_t));
 		if (loadedBytes != count * sizeof(wifiCredentials_t))
 		{
-			log_e("Fehler beim Laden der WLAN-Daten");
+			loge("Fehler beim Laden der WLAN-Daten");
 			wifiCreds.clear();
 		}
 	}
@@ -203,7 +203,7 @@ size_t readFileList(const char *fileext)
 
 size_t deleteAllFiles()
 {
-	log_i("Del all files");
+	logi("Del all files");
 	size_t count = 0;
 	char path[LEN_FILENAME];
 	xSemaphoreTake(logfile_sem, portMAX_DELAY);
@@ -238,7 +238,7 @@ size_t deleteFile(const time_t id)
 	}
 	else
 	{
-		log_w("Konnte %s nicht löschen", filename);
+		logw("Konnte %s nicht löschen", filename);
 	}
 	xSemaphoreGive(logfile_sem);
 	return count;
@@ -299,7 +299,7 @@ void cleanupStorage()
 
 		if (!oldest[0])
 			return;
-		log_i("Nur %d KB frei. Lösche %s", free / 1024, oldest);
+		logi("Nur %d KB frei. Lösche %s", free / 1024, oldest);
 		if (!LittleFS.remove(oldest))
 			return;
 	}

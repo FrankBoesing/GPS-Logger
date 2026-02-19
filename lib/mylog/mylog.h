@@ -13,8 +13,10 @@
 // limitations under the License.
 #ifndef __MY_CUSTOM_LOG_H__
 #define __MY_CUSTOM_LOG_H__
+#include <stddef.h>
 
 void initRamLogging();
+void initTelnetLogging();
 
 // Typ-Definition für einen Output-Stream (z.B. Telnet oder Serial)
 typedef void (*LogOutputCallback)(const char *line);
@@ -37,7 +39,7 @@ extern "C"
 // --- RAM LOG KONFIGURATION ---
 #define RAM_LOG_SIZE 4096
 	// extern char ram_log_buffer[RAM_LOG_SIZE];
-	// extern int ram_log_idx;
+	// extern int ram_logi(dx;
 
 	// Eigene Print-Funktion
 	int custom_ram_printf(const char *fmt, ...);
