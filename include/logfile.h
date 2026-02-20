@@ -1,5 +1,4 @@
-#ifndef LOGFILE_H
-#define LOGFILE_H
+#pragma once
 
 #include "includes.h"
 
@@ -85,5 +84,3 @@ private:
 	inline int32_t zigzagDecode(uint32_t v);
 	bool readAbsolute(GPSPoint_t &p);
 };
-
-#endif

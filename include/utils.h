@@ -1,6 +1,4 @@
-#ifndef UTILS_H
-#define UTILS_H
-
+#pragma once
 #include "includes.h"
 
 void onWiFiEvent(arduino_event_id_t event);
@@ -18,5 +16,3 @@ size_t deleteAllFiles();
 size_t deleteFile(const time_t id);
 
 void cleanupStorage();
-
-#endif

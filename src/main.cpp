@@ -77,13 +77,13 @@ static void handleGPSData()
 
 		if (gps.encode((char) ch))
 		{
-			digitalWrite(LED, HIGH);
+			LEDON();
 
 			time_t utc = 0;
 			timeFromGPS(gps, utc);
 			saveToGPSLog(gps, utc);
 
-			digitalWrite(LED, LOW);
+			LEDOFF();
 			return;
 		}
 	}
@@ -199,7 +199,7 @@ static bool error(const char *msg = nullptr)
 		if (m - t > 80)
 		{
 			t = m;
-			digitalWrite(LED, !digitalRead(LED) );
+			LEDTOGGLE();
 			loge("%s", err);
 		}
 		return true;
@@ -211,14 +211,14 @@ static bool error(const char *msg = nullptr)
 void setup()
 {
 	pinMode(LED, OUTPUT);
-	digitalWrite(LED, HIGH);
+	LEDON();
 
 	WiFi.useStaticBuffers(true);
 
 	Serial.begin(115200);
 	initRamLogging();
 	delay(50);
-	
+
 	GPSSerial.setRxBufferSize(512);
 	GPSSerial.begin(GPS_BAUD, SERIAL_8N1, GPS_RX_PIN, GPS_TX_PIN);
 	while (GPSSerial.read() >= 0)
@@ -280,7 +280,7 @@ void setup()
 
 	logi("Setup abgeschlossen.");
 
-	digitalWrite(LED, LOW);
+	LEDOFF();
 }
 
 /****************************************************************************************************************************/

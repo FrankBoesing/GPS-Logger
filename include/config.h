@@ -1,5 +1,4 @@
-#ifndef CONFIG_H
-#define CONFIG_H
+#pragma once
 
 // ---------- GPS & Bewegung ----------
 
@@ -40,12 +39,27 @@
 
 #define CPU_FREQ_DEFAULT       CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ
 
-
-
 /*****************************************************************************************************/
+#ifdef LED
+
+#ifdef LED_INVERTED
+    #define LED_ACTIVE_LEVEL   HIGH
+    #define LED_INACTIVE_LEVEL LOW
+#else
+    #define LED_ACTIVE_LEVEL   LOW
+    #define LED_INACTIVE_LEVEL HIGH
+#endif
+
+#define LEDON() do { digitalWrite(LED, LED_ACTIVE_LEVEL); } while (0)
+#define LEDOFF() do { digitalWrite(LED, LED_INACTIVE_LEVEL); } while (0)
+#define LEDTOGGLE() do { digitalWrite(LED, !digitalRead(LED)); } while (0)
+#else
+#define LEDON()     do { } while (0)
+#define LEDOFF()    do { } while (0)
+#define LEDTOGGLE() do { } while (0)
+#endif
+
 
 #if ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 2, 0)
 #error "Wegen Nutzung von LittleFS Timestamps wird zwingend mindestens IDF 3.2 benötigt."
-#endif
-
 #endif

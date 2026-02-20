@@ -1,5 +1,5 @@
-#ifndef GPS_H
-#define GPS_H
+#pragma once
+
 #include <Arduino.h>
 
 #define SPEED_MOVE_KMH 2.5f
@@ -52,5 +52,3 @@ typedef struct
 /****************************************/
 
 bool gps_state_update(const gps_data_t &data, gps_state_ctx_t &ctx);
-
-#endif
