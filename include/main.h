@@ -1,9 +1,6 @@
 #pragma once
 #include "includes.h"
 
-#define MILLISECOND 1000UL // us
-#define SECOND (1000UL * MILLISECOND)
-
 typedef enum : uint8_t
 {
 	NOLOG = 0,
@@ -25,5 +22,3 @@ struct wifiCredentials_t
 	char ssid[WIFI_SSID_MAX_LEN];
 	char pass[WIFI_PASS_MAX_LEN];
 };
-
-#define OPTSIZE __attribute__((optimize("Os")))

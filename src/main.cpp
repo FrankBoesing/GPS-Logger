@@ -10,7 +10,7 @@ std::atomic<log_cmd_t> logCmd = NOPE;
 
 static size_t _fsTotalBytes;
 const size_t &fsTotalBytes = _fsTotalBytes; // make it read-only
-ulong firstFix = 0;
+uint32_t firstFix = 0;
 gps_state_ctx_t gps_state = {};
 
 /****************************************************************************************************************************/
@@ -125,8 +125,6 @@ static void saveToGPSLog(TinyGPSPlus &gps, const time_t &utc) // Wird sekündlic
 
 	if (prevUtc == utc)
 		return;
-
-	const ulong m = micros();
 	startStop(utc);
 
 	float dt_gps = 1.0f;
@@ -137,8 +135,8 @@ static void saveToGPSLog(TinyGPSPlus &gps, const time_t &utc) // Wird sekündlic
 	prevUtc = utc;
 
 	const uint8_t fix = gps.location.FixQuality() - '0';
-	if (firstFix == 0 && fix > 0)
-		firstFix = m;
+	if (fix > 0 && firstFix == 0)
+		firstFix = millis();
 
 	bool ok = gps_state_update((gps_data_t){
 								   .lat = gps.location.lat(),
@@ -160,12 +158,8 @@ static void saveToGPSLog(TinyGPSPlus &gps, const time_t &utc) // Wird sekündlic
 			if (flush || gps_state.motion_state == GPS_MOVING)
 				logfile.writePoint(gps.location.lat(), gps.location.lng(), utc, flush);
 		}
-		logfile.periodicFlush();
+		logfile.intervalFlush();
 	}
-
-#if TIME_GPS_HANDLING
-	logi("GPS handling: %u ms", (micros() - m) / 1000);
-#endif
 }
 
 /****************************************************************************************************************************/
@@ -173,39 +167,29 @@ static void saveToGPSLog(TinyGPSPlus &gps, const time_t &utc) // Wird sekündlic
 /****************************************************************************************************************************/
 static void wifiMulti_run()
 {
-	if (WiFi.status() != WL_CONNECTED && WiFi.softAPgetStationNum() == 0)
+	static uint32_t lastScan = 0;
+	if (WiFi.status() != WL_CONNECTED &&
+		WiFi.softAPgetStationNum() == 0 &&
+		interval(lastScan, 10000) // Nur alle 10 Sek.
+	)
 	{
-		static unsigned long lastScan = 0;
-		if (millis() - lastScan > 10000)
-		{ // Nur alle 10 Sek.
-			wifiMulti.run();
-			lastScan = millis();
-		}
+		wifiMulti.run();
 	}
 }
 /****************************************************************************************************************************/
 
-static bool error(const char *msg = nullptr)
+static void error(const char *msg = nullptr)
 {
 	static char err[32] = {};
-	static ulong t = 0;
+	static uint32_t t = 0;
 
 	if (msg)
 		strlcpy(err, msg, sizeof(err));
 
-	if (err[0]) {
-
-		const ulong m = millis();
-		if (m - t > 80)
-		{
-			t = m;
+	if (err[0] && interval(t, 80)) {
 			LEDTOGGLE();
 			loge("%s", err);
 		}
-		return true;
-	}
-
-	return false;
 }
 
 void setup()
@@ -217,7 +201,7 @@ void setup()
 
 	Serial.begin(115200);
 	initRamLogging();
-	delay(50);
+	yield();
 
 	GPSSerial.setRxBufferSize(512);
 	GPSSerial.begin(GPS_BAUD, SERIAL_8N1, GPS_RX_PIN, GPS_TX_PIN);
@@ -250,19 +234,19 @@ void setup()
 		wifiMulti.run();
 	}
 	WiFi.setAutoReconnect(true);
-	delay(25);
+	yield();
 
 	initLogfile();
 	setupWebServer();
-	delay(5);
+	yield();
 
 	cleanupStorage();
 	readFileList(FILE_SUFFIX);
-	delay(5);
+	yield();
 
 	initOTA();
 	initTelnetLogging();
-	delay(5);
+	yield();
 
 	logi("---- Access Point  ----");
 	logi("SSID       : %s", AP_SSID);
@@ -273,7 +257,7 @@ void setup()
 	if (!GPSSerial.find("\n"))
 		error("GPS nicht verbunden.");
 	hwinit();
-	delay(5);
+	yield();
 
 	if (logMode == LOGAUTOSTART)
 		logCmd = STARTNOW;
@@ -290,7 +274,8 @@ void loop()
 	wifiMulti_run();
 	handleOTA();
 	error();
-	delay(10);
+	yield();
 	handleGPSData();
+	yield();
 	boost();
 }

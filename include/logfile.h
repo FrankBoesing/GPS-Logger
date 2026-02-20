@@ -39,7 +39,7 @@ public:
 	void close();
 	bool isActive(const char *path) { return (f && strcmp(f.path(), path) == 0); }
 	size_t getPoints() { return pointsWritten; }
-	void periodicFlush();
+	void intervalFlush();
 	operator bool() const { return f; }
 
 protected:

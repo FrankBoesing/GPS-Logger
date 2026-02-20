@@ -3,7 +3,7 @@
 
 void onWiFiEvent(arduino_event_id_t event);
 void boost(const bool fast = false);
-
+bool interval(uint32_t &last, const uint32_t interval_ms);
 void loadPrefs();
 void savePrefs();
 

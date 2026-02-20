@@ -11,7 +11,7 @@ void boost(const bool fast)
 	return;
 #endif
 
-	static ulong lastBoost = 0;
+	static uint32_t lastBoost = 0;
 	static bool isFast = true;
 
 	if (fast)
@@ -302,4 +302,14 @@ void cleanupStorage()
 		if (!LittleFS.remove(oldest))
 			return;
 	}
+}
+
+bool interval(uint32_t &last, const uint32_t interval_ms)
+{
+    const uint32_t now = millis();
+    if (now - last >= interval_ms) {
+        last += interval_ms;
+        return true;
+    }
+    return false;
 }

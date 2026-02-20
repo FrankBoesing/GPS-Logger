@@ -48,7 +48,7 @@ void logfileW::open(const time_t time)
 		id2filename(time, filename, sizeof(filename));
 
 	xSemaphoreTake(logfile_sem, portMAX_DELAY);
-	pointsWritten = pointsInFileCache = 0;
+	pointsWritten = pointsInFileCache = lastFlush = 0;
 	f = LittleFS.open(filename, append ? FILE_APPEND : FILE_WRITE);
 	filelistSetActive(f, true);
 	xSemaphoreGive(logfile_sem);
@@ -114,7 +114,7 @@ uint32_t logfileW::zigzagEncode(int32_t x)
 void  logfileW::_flush_unlocked() {
     if (pointsInFileCache == 0 || !f) return;
 
-	lastFlush = micros();
+	lastFlush = millis();
     size_t p = 0;
 
     if (pointsWritten == 0) {
@@ -168,9 +168,9 @@ void logfileW::flush() {
     xSemaphoreGive(logfile_sem);
 }
 
-void logfileW::periodicFlush()
+void logfileW::intervalFlush()
 {
-	if (micros() - lastFlush > FILECACHE_MAXAGE * SECOND)
+	if (millis() - lastFlush > FILECACHE_MAXAGE)
 		flush();
 }
 /****************************************************************************************************************************/
@@ -258,7 +258,7 @@ bool logfileR::readPoint(GPSPoint_t &p) {
 */
 size_t logfileR::getFileInfo(GPSPoint_t &firstp, GPSPoint_t &lastp)
 {
-	// ulong m = micros();
+	// uint32_t m = micros();
 	if (!f)
 		return 0;
 	f.seek(0);

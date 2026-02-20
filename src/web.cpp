@@ -205,7 +205,7 @@ static void noContent(AsyncWebServerRequest *request)
 	request->send(http_NOCONTENT);
 }
 
-OPTSIZE void setupWebServer()
+void setupWebServer()
 {
 	semDL = xSemaphoreCreateBinary();
 	xSemaphoreGive(semDL);

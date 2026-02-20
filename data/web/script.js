@@ -99,7 +99,7 @@ async function displayFiles() {
 async function displayStatus() {
 	const rows = [
 		["Genauigkeit", data.q + " m"],
-		["Erster Fix", (data.firstFix / 1e6).toFixed(0) + " s"],
+		["Erster Fix", (data.firstFix / 1000).toFixed(0) + " s"],
 		["RAM frei", (data.RAMminFree / 1024).toFixed(1) + " KB"],
 		["Flash frei", ((data.total - data.used) / 1024).toFixed(0) + " KB"]
 	].map(([k, v]) => `<tr><th>${k}</th><td>${v}</td></tr>`).join("\n");
