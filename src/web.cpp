@@ -2,7 +2,7 @@
 #include <ArduinoJson.h>
 
 static AsyncWebServer server(80);
-static const constexpr char EVENTS[] = "/events";
+static constexpr char EVENTS[] = "/events";
 static AsyncEventSource events(EVENTS);
 
 /****************************************************************************************************************************/
@@ -64,22 +64,22 @@ void uiSendJson(const bool fileList, const bool wifiCredentials, const bool stat
 	yield();
 }
 /****************************************************************************************************************************/
-static const constexpr int http_OK = 200;
-static const constexpr int http_NOCONTENT = 204;
-static const constexpr int http_BADREQUEST = 400;
-static const constexpr int http_NOTFOUND = 404;
-static const constexpr int http_CONFLICT = 409;
-static const constexpr int http_ERROR = 500;
-static const constexpr int http_BUSY = 503;
+static constexpr int http_OK = 200;
+static constexpr int http_NOCONTENT = 204;
+static constexpr int http_BADREQUEST = 400;
+static constexpr int http_NOTFOUND = 404;
+static constexpr int http_CONFLICT = 409;
+static constexpr int http_ERROR = 500;
+static constexpr int http_BUSY = 503;
 static constexpr const char *cachectrl = CORE_DEBUG_LEVEL >= ARDUHAL_LOG_LEVEL_DEBUG
 											 ? "no-cache, no-store, must-revalidate"
 											 : "max-age=86400";
 
 /****************************************************************************************************************************/
-static const constexpr char GPXHEADER[] = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<gpx>\n<trk><trkseg>\n";
-static const constexpr char GPXFOOTER[] = "</trkseg></trk>\n</gpx>";
-static const constexpr char TRACKHEAD[] = "<trkpt lat=\"%.7f\" lon=\"%.7f\"><time>";
-static const constexpr char TRACKFOOTER[] = "</time></trkpt>\n";
+static constexpr char GPXHEADER[] = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<gpx>\n<trk><trkseg>\n";
+static constexpr char GPXFOOTER[] = "</trkseg></trk>\n</gpx>";
+static constexpr char TRACKHEAD[] = "<trkpt lat=\"%.7f\" lon=\"%.7f\"><time>";
+static constexpr char TRACKFOOTER[] = "</time></trkpt>\n";
 
 enum DLState
 {

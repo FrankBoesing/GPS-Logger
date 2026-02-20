@@ -17,10 +17,10 @@ void initLogfile()
 
 /****************************************************************************************************************************/
 
-static const constexpr long SCALE = 10000000L;
-static const constexpr double RSCALE = 1.0 / SCALE;
-static const constexpr size_t SZ32 = sizeof(int32_t);
-static const constexpr uint32_t MAGIC = 0xbabeef;
+static constexpr long SCALE = 10000000L;
+static constexpr double RSCALE = 1.0 / SCALE;
+static constexpr size_t SZ32 = sizeof(int32_t);
+static constexpr uint32_t MAGIC = 0xbabeef;
 
 // Eine Klasse ist hier am praktischten:
 

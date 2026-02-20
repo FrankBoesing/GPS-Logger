@@ -38,8 +38,8 @@ static constexpr const char *_state[GPS_STATE_COUNT] = {"INIT", "ACQUIRE", "LOCK
 
 /****************************************/
 
-const constexpr float EARTH_RADIUS_M_F = 6371000.0f;
-const constexpr float DEG2RAD_F = 0.01745329251994329577f;
+static constexpr float EARTH_RADIUS_M_F = 6371000.0f;
+static constexpr float DEG2RAD_F = 0.01745329251994329577f;
 
 /* Equirectangular Approximation (Pythagoras auf einer Ebene)
 	ist bis einige km Distanz völlig ausreichend exakt.

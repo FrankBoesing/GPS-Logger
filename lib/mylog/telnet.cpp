@@ -9,7 +9,7 @@
 
 static AsyncTelnet logsrv;
 
-static const constexpr uint8_t telnet8BitMode[] = {
+static constexpr uint8_t telnet8BitMode[] = {
 	255, 251, 1, // IAC WILL ECHO
 	255, 251, 3, // IAC WILL SUPPRESS GO AHEAD
 	255, 252, 34 // IAC WONT LINEMODE
