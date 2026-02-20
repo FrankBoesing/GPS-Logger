@@ -170,7 +170,7 @@ static void wifiMulti_run()
 	static uint32_t lastScan = 0;
 	if (WiFi.status() != WL_CONNECTED &&
 		WiFi.softAPgetStationNum() == 0 &&
-		interval(lastScan, 10000) // Nur alle 10 Sek.
+		interval(lastScan, 5000) // Nur alle 5 Sek.
 	)
 	{
 		wifiMulti.run();

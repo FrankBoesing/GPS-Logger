@@ -2,38 +2,12 @@
 #include <ArduinoJson.h>
 
 static AsyncWebServer server(80);
-static AsyncEventSource events("/events");
-static SemaphoreHandle_t semDL; // Download
+static const constexpr char EVENTS[] = "/events";
+static AsyncEventSource events(EVENTS);
+
+/****************************************************************************************************************************/
+/****************************************************************************************************************************/
 static char JsonBuf[4096];
-
-enum DLState
-{
-	Done,
-	Header,
-	Points,
-	Footer
-};
-struct DContext
-{
-	logfileR f;
-	DLState state;
-	DContext() : state(Done) {}
-	bool begin(const char *path)
-	{
-		bool r = f.open(path);
-		state = r ? Header : Done;
-		return r;
-	}
-	void close()
-	{
-		f.close();
-		state = Done;
-	}
-};
-static DContext dlCtx;
-
-/****************************************************************************************************************************/
-/****************************************************************************************************************************/
 
 void uiSendJson(const bool fileList, const bool wifiCredentials, const bool staticData)
 {
@@ -102,102 +76,149 @@ static constexpr const char *cachectrl = CORE_DEBUG_LEVEL >= ARDUHAL_LOG_LEVEL_D
 											 : "max-age=86400";
 
 /****************************************************************************************************************************/
+static const constexpr char GPXHEADER[] = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<gpx>\n<trk><trkseg>\n";
+static const constexpr char GPXFOOTER[] = "</trkseg></trk>\n</gpx>";
+static const constexpr char TRACKHEAD[] = "<trkpt lat=\"%.7f\" lon=\"%.7f\"><time>";
+static const constexpr char TRACKFOOTER[] = "</time></trkpt>\n";
+
+enum DLState
+{
+	Done,
+	Header,
+	Points,
+	Footer
+};
+struct DContext
+{
+	logfileR f;
+	DLState state;
+	DContext() : state(Done) {}
+	bool begin(const char *path)
+	{
+		bool r = f.open(path);
+		state = r ? Header : Done;
+		return r;
+	}
+	void close()
+	{
+		f.close();
+		state = Done;
+	}
+};
+static DContext dlCtx;
+static SemaphoreHandle_t semDL;
+static inline size_t formatIsoTime(char* buffer, const struct tm *tm);
+
 /* Chunked Download mit Konvertierung vom Binär- ins xml Format */
 void download(AsyncWebServerRequest *request)
 {
-	const auto *param = request->getParam("file");
-	if (!param) {
-			request->send(http_BADREQUEST);
-			return;
-		}
-	const char *idstr = param->value().c_str();
-	char fbuf[128];
-	snprintf(fbuf, sizeof(fbuf), FILE_PREFIX "%s" FILE_SUFFIX, idstr);
+    const auto *param = request->getParam("file");
+    if (!param) {
+            request->send(http_BADREQUEST);
+            return;
+        }
+    const char *idstr = param->value().c_str();
+    char fbuf[128];
+    snprintf(fbuf, sizeof(fbuf), FILE_PREFIX "%s" FILE_SUFFIX, idstr);
 
-	if (logfile.isActive(fbuf))
-	{
-		request->send(http_CONFLICT);
-		return;
-	}
+    if (logfile.isActive(fbuf))
+    {
+        request->send(http_CONFLICT);
+        return;
+    }
 
-	if (xSemaphoreTake(semDL, pdMS_TO_TICKS(100)) != pdTRUE)
-	{
-		request->send(http_BUSY);
-		return;
-	}
+    if (xSemaphoreTake(semDL, pdMS_TO_TICKS(100)) != pdTRUE)
+    {
+        request->send(http_BUSY);
+        return;
+    }
 
-	if (!dlCtx.begin(fbuf))
-	{
-		xSemaphoreGive(semDL);
-		request->send(http_NOTFOUND);
-		return;
-	}
+    if (!dlCtx.begin(fbuf))
+    {
+        xSemaphoreGive(semDL);
+        request->send(http_NOTFOUND);
+        return;
+    }
 
-	if (request->hasParam("raw"))
-	{ // http://gps.local/download?file=1767392372&raw
-		dlCtx.close();
-		request->send(LittleFS, fbuf, asyncsrv::T_application_octet_stream, true);
-		xSemaphoreGive(semDL);
-		return;
-	}
+    if (request->hasParam("raw"))
+    { // http://gps.local/download?file=1767392372&raw
+        dlCtx.close();
+        request->send(LittleFS, fbuf, asyncsrv::T_application_octet_stream, true);
+        xSemaphoreGive(semDL);
+        return;
+    }
 
-	auto generator = [](uint8_t *buffer, size_t maxLen, size_t index) -> size_t
-	{
-		size_t pos = 0;
-		const constexpr std::string_view GPXHEADER = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<gpx>\n<trk><trkseg>\n";
-		const constexpr std::string_view GPXFOOTER = "</trkseg></trk>\n</gpx>";
+    auto generator = [](uint8_t *buffer, size_t maxLen, size_t index) -> size_t
+    {
+        size_t pos = 0;
+        switch (dlCtx.state)
+        {
+        case Header:
+            {
+                const size_t len = sizeof(GPXHEADER) - 1;
+                pos = std::min(len, maxLen);
+                memcpy(buffer, GPXHEADER, pos);
+                dlCtx.state = Points;
+            }
+            break;
 
-		switch (dlCtx.state)
-		{
-		case Header:
-			pos = std::min(GPXHEADER.size(), maxLen);
-			std::copy_n(GPXHEADER.data(), pos, buffer);
-			dlCtx.state = Points;
-			break;
+        case Points:
+            while (pos + 128 <= maxLen)
+            {
+                GPSPoint_t point;
+                struct tm tm;
+                if (!dlCtx.f.readPoint(point))
+                {
+                    dlCtx.state = Footer;
+                    break;
+                }
 
-		case Points:
-			while (pos + 128 <= maxLen)
-			{
-				GPSPoint_t point;
-				struct tm tm;
-				if (!dlCtx.f.readPoint(point))
-				{
-					dlCtx.state = Footer;
-					break;
-				}
-				gmtime_r(&point.time, &tm);
-				pos += snprintf((char *)buffer + pos, maxLen - pos,
-								"<trkpt lat=\"%.7f\" lon=\"%.7f\"><time>%04d-%02d-%02dT%02d:%02d:%02dZ</time></trkpt>\n",
-								point.lat, point.lon, tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
-								tm.tm_hour, tm.tm_min, tm.tm_sec);
-			}
-			break;
+                // 1. Koordinaten
+                pos += snprintf((char *)buffer + pos, maxLen - pos, TRACKHEAD, point.lat, point.lon);
 
-		case Footer:
-			pos = std::min(GPXFOOTER.size(), maxLen);
-			std::copy_n(GPXFOOTER.data(), pos, buffer);
-			dlCtx.state = Done;
-			break;
+                // 2. Zeit direkt an die aktuelle Position schreiben
+                if (pos + 20 < maxLen) {
+					gmtime_r(&point.time, &tm);
+                    pos += formatIsoTime((char *)buffer + pos, &tm);
+                }
 
-		case Done:
-			pos = 0;
-			break;
-		}
+                // 3. Rest anhängen (ohne das Null-Byte von sizeof)
+                const size_t footLen = sizeof(TRACKFOOTER) - 1;
+                if (pos + footLen < maxLen) {
+                    memcpy((char *)buffer + pos, TRACKFOOTER, footLen);
+                    pos += footLen;
+                }
+            }
+            break;
 
-		return pos;
-	};
+        case Footer:
+            {
+                const size_t len = sizeof(GPXFOOTER) - 1;
+                pos = std::min(len, maxLen);
+                memcpy(buffer, GPXFOOTER, pos);
+                dlCtx.state = Done;
+            }
+            break;
 
-	request->onDisconnect([]()
-						  {
-					dlCtx.close();
-					xSemaphoreGive(semDL); });
+        case Done:
+            pos = 0;
+            break;
+        }
 
-	AsyncWebServerResponse *response =
-		request->beginChunkedResponse(asyncsrv::T_application_octet_stream, generator);
-	snprintf(fbuf, sizeof(fbuf), "attachment; filename=\"%s.gpx\"", idstr);
-	response->addHeader(asyncsrv::T_Content_Disposition, fbuf);
-	response->addHeader("X-Content-Type-Options", "nosniff");
-	request->send(response);
+        return pos;
+    };
+
+    request->onDisconnect([]()
+                          {
+                    dlCtx.close();
+                    xSemaphoreGive(semDL); });
+
+    AsyncWebServerResponse *response =
+        request->beginChunkedResponse(asyncsrv::T_application_octet_stream, generator);
+    snprintf(fbuf, sizeof(fbuf), "attachment; filename=\"%s.gpx\"", idstr);
+    response->addHeader(asyncsrv::T_Content_Disposition, fbuf);
+    response->addHeader("X-Content-Type-Options", "nosniff");
+    request->send(response);
 }
 
 static void noContent(AsyncWebServerRequest *request)
@@ -220,7 +241,7 @@ void setupWebServer()
 							 next(); // Lässt den Request zum eigentlichen Ziel weiterwandern
 						 });
 
-	server.on("/events", HTTP_OPTIONS, noContent);
+	server.on(EVENTS, HTTP_OPTIONS, noContent);
 	server.on("/", HTTP_OPTIONS, noContent);
 
 	/**********************/
@@ -332,4 +353,46 @@ void setupWebServer()
 
 	server.addHandler(&events);
 	server.begin();
+}
+
+//Sehr viel schneller als snprintf..
+static inline size_t formatIsoTime(char* buffer, const struct tm *tm)
+{
+    char* p = buffer;
+
+    // Jahr (4-stellig)
+    int year = tm->tm_year + 1900;
+    *p++ = (year / 1000) + '0';
+    *p++ = ((year / 100) % 10) + '0';
+    *p++ = ((year / 10) % 10) + '0';
+    *p++ = (year % 10) + '0';
+    *p++ = '-';
+
+    // Monat
+    int mon = tm->tm_mon + 1;
+    *p++ = (mon / 10) + '0';
+    *p++ = (mon % 10) + '0';
+    *p++ = '-';
+
+    // Tag
+    *p++ = (tm->tm_mday / 10) + '0';
+    *p++ = (tm->tm_mday % 10) + '0';
+    *p++ = 'T';
+
+    // Stunde
+    *p++ = (tm->tm_hour / 10) + '0';
+    *p++ = (tm->tm_hour % 10) + '0';
+    *p++ = ':';
+
+    // Minute
+    *p++ = (tm->tm_min / 10) + '0';
+    *p++ = (tm->tm_min % 10) + '0';
+    *p++ = ':';
+
+    // Sekunde
+    *p++ = (tm->tm_sec / 10) + '0';
+    *p++ = (tm->tm_sec % 10) + '0';
+    *p++ = 'Z';
+
+    return 20; // Die Länge von "YYYY-MM-DDTHH:MM:SSZ"
 }
