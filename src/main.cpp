@@ -5,7 +5,7 @@
 
 WiFiMulti wifiMulti;
 std::atomic<log_mode_t> logMode = NOLOG;
-std::atomic<bool> logAppend = 1;
+std::atomic<bool> logAppend = true;
 std::atomic<log_cmd_t> logCmd = NOPE;
 
 static size_t _fsTotalBytes;
@@ -219,7 +219,7 @@ void setup()
 	_fsTotalBytes = LittleFS.totalBytes();
 
 	WiFi.onEvent(onWiFiEvent);
-	WiFi.setHostname(HOSTNAME); // muss die erste Einstellung sein
+	WiFi.setHostname(HOSTNAME);
 	WiFi.mode(WIFI_AP_STA);
 	esp_wifi_set_max_tx_power((int8_t)((float)WiFI_MAX_POWER * 4.0f));
 

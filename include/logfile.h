@@ -80,8 +80,10 @@ protected:
 	File f;
 
 private:
-	int32_t lastLat, lastLon;
+
 	uint32_t lastT;
+	int32_t lastLat, lastLon;
+
 	bool readVarUint(uint32_t &out);
 	inline int32_t zigzagDecode(uint32_t v);
 
@@ -91,6 +93,7 @@ private:
 	size_t readBufPos = 0;
 	size_t readBufLen = 0;
 
+	inline bool refillBuffer();
 	int bufferedRead();
 	size_t bufferedRead(uint8_t *dst, size_t len);
 };

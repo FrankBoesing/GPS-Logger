@@ -216,8 +216,8 @@ inline int32_t logfileR::zigzagDecode(uint32_t v)
 
 bool logfileR::readPoint(GPSPoint_t &p)
 {
-	bool isAbsolute = (pointsRead == 0);
 	uint32_t vT = 0;
+	bool isAbsolute = (pointsRead == 0);
 
 	// 1. Entscheidung: Lesen wir Deltas oder Absolute Werte?
 	if (!isAbsolute)
@@ -225,20 +225,18 @@ bool logfileR::readPoint(GPSPoint_t &p)
 		if (!readVarUint(vT))
 			return false;
 		if (vT == APPEND_MARKER)
-		{
 			isAbsolute = true; // Marker gefunden -> umschalten auf Absolut-Modus
-		}
 	}
 
 	// 2. Daten einlesen
 	if (isAbsolute)
 	{
-		if (bufferedRead((uint8_t *)&lastT, SZ32) != SZ32)
+		uint32_t buf[3];
+		if (bufferedRead((uint8_t *)&buf, sizeof(buf)) != sizeof(buf))
 			return false;
-		if (bufferedRead((uint8_t *)&lastLat, SZ32) != SZ32)
-			return false;
-		if (bufferedRead((uint8_t *)&lastLon, SZ32) != SZ32)
-			return false;
+		lastT = buf[0];
+		lastLat = buf[1];
+		lastLon = buf[2];
 	}
 	else
 	{
@@ -262,18 +260,22 @@ bool logfileR::readPoint(GPSPoint_t &p)
 	return true;
 }
 
+inline bool logfileR::refillBuffer()
+{
+	readBufLen = f.read(readBuf, READBUF_SIZE);
+	readBufPos = 0;
+	return readBufLen > 0;
+}
+
 // Buffered read helpers for logfileR
 int logfileR::bufferedRead()
 {
 	if (!f)
 		return -1;
 	if (readBufPos >= readBufLen)
-	{
-		readBufLen = f.read(readBuf, READBUF_SIZE);
-		readBufPos = 0;
-		if (readBufLen == 0)
-			return -1;
-	}
+		if (!refillBuffer())
+			return -1; // EOF
+
 	return (int)readBuf[readBufPos++];
 }
 
@@ -285,15 +287,10 @@ size_t logfileR::bufferedRead(uint8_t *dst, size_t len)
 	while (total < len)
 	{
 		if (readBufPos >= readBufLen)
-		{
-			readBufLen = f.read(readBuf, READBUF_SIZE);
-			readBufPos = 0;
-			if (readBufLen == 0)
+			if (!refillBuffer())
 				break; // EOF
-		}
-		size_t avail = readBufLen - readBufPos;
-		size_t want = (len - total);
-		size_t toCopy = (avail < want) ? avail : want;
+
+		size_t toCopy = std::min(readBufLen - readBufPos, len - total);
 		memcpy(dst + total, readBuf + readBufPos, toCopy);
 		readBufPos += toCopy;
 		total += toCopy;
