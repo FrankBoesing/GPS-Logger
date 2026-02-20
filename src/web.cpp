@@ -165,6 +165,7 @@ void download(AsyncWebServerRequest *request)
             break;
 
         case Points:
+			[[likely]]
             while (pos + TRACK_WORST_CASE_LEN <= maxLen)
             {
                 GPSPoint_t point;
@@ -175,7 +176,9 @@ void download(AsyncWebServerRequest *request)
                 }
 
                 // 1. Koordinaten
-                pos += snprintf((char *)buffer + pos, maxLen - pos, TRACKHEAD, point.lat, point.lon);
+				int len1 = snprintf((char *)buffer + pos, maxLen - pos, TRACKHEAD, point.lat, point.lon);
+				if (len1 <= 0) break;
+                pos += len1;
 
                 // 2. Zeit direkt an die aktuelle Position schreiben
 				int timeLen = formatGpxTime((char *)buffer + pos, point.time);
@@ -184,7 +187,6 @@ void download(AsyncWebServerRequest *request)
 
                 // 3. Rest anhängen (ohne das Null-Byte von sizeof)
                 const size_t footLen = sizeof(TRACKFOOTER) - 1;
-
                 memcpy((char *)buffer + pos, TRACKFOOTER, footLen);
                 pos += footLen;
             }

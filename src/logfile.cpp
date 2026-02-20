@@ -35,7 +35,7 @@ void logfileW::open(const time_t time)
 	// Falls in LogMode eingeschaltet, prüfen ob an die jüngste Datei angehängt werden soll:
 	if (logAppend && filelist.size() > 0) // An letztes Logfile anfügen?
 	{
-		const auto& e = *(filelist.end() - 1);
+		const auto &e = *(filelist.end() - 1);
 		if (time - e.lastWrite <= MAX_IDLE_SECONDS)
 		{
 			append = true;
@@ -57,42 +57,47 @@ void logfileW::open(const time_t time)
 	logi("Logfile: %s", filename);
 }
 
-void logfileW::close() {
-	if (!f) return;
-    xSemaphoreTake(logfile_sem, portMAX_DELAY);
+void logfileW::close()
+{
+	if (!f)
+		return;
+	xSemaphoreTake(logfile_sem, portMAX_DELAY);
 
-	if (pointsInFileCache > 0) {
+	if (pointsInFileCache > 0)
+	{
 		_flush_unlocked(); // Letzte Daten sichern
 	}
 	filelistSetActive(f, false);
 	f.close();
 	pointsInFileCache = 0; // Cache für die nächste Tour leeren
-	pointsWritten = 0;     // Status zurücksetzen
+	pointsWritten = 0;	   // Status zurücksetzen
 
-    xSemaphoreGive(logfile_sem);
+	xSemaphoreGive(logfile_sem);
 	uiSendJson();
 }
 
 void logfileW::writePoint(const double lat, const double lon, const time_t time, const bool forceFlush)
 {
-    if (!f) return;
+	if (!f)
+		return;
 
-    xSemaphoreTake(logfile_sem, portMAX_DELAY);
+	xSemaphoreTake(logfile_sem, portMAX_DELAY);
 
-    if (pointsInFileCache >= FILECACHE_MAXPOINTS) {
-        _flush_unlocked();
-        pointsInFileCache = 0;
-    }
+	if (pointsInFileCache >= FILECACHE_MAXPOINTS)
+	{
+		_flush_unlocked();
+		pointsInFileCache = 0;
+	}
 
-    writeCache[pointsInFileCache++] = {lat, lon, time};
+	writeCache[pointsInFileCache++] = {lat, lon, time};
 
-    if (forceFlush || pointsWritten == 0)
-    {
-        _flush_unlocked();
-        pointsInFileCache = 0;
-    }
+	if (forceFlush || pointsWritten == 0)
+	{
+		_flush_unlocked();
+		pointsInFileCache = 0;
+	}
 
-    xSemaphoreGive(logfile_sem);
+	xSemaphoreGive(logfile_sem);
 }
 
 void logfileW::writeVarUint(uint32_t v)
@@ -111,61 +116,66 @@ uint32_t logfileW::zigzagEncode(int32_t x)
 	return (uint32_t)((uint32_t)(x << 1) ^ (uint32_t)(x >> 31));
 }
 
-void  logfileW::_flush_unlocked() {
-    if (pointsInFileCache == 0 || !f) return;
+void logfileW::_flush_unlocked()
+{
+	if (pointsInFileCache == 0 || !f)
+		return;
 
 	lastFlush = millis();
-    size_t p = 0;
+	size_t p = 0;
 
-    if (pointsWritten == 0) {
-        if (f.size() > 0) {
-            writeVarUint(APPEND_MARKER); // Anfüge-Marker
-        }
+	if (pointsWritten == 0)
+	{
+		if (f.size() > 0)
+		{
+			writeVarUint(APPEND_MARKER); // Anfüge-Marker
+		}
 
-        // Erster Punkt unkomprimiert (immer double -> int32)
-        lastLat = (int32_t)lround(writeCache[0].lat * SCALE);
-        lastLon = (int32_t)lround(writeCache[0].lon * SCALE);
-        lastT   = (uint32_t)(writeCache[0].time);
+		// Erster Punkt unkomprimiert (immer double -> int32)
+		lastLat = (int32_t)lround(writeCache[0].lat * SCALE);
+		lastLon = (int32_t)lround(writeCache[0].lon * SCALE);
+		lastT = (uint32_t)(writeCache[0].time);
 
-        f.write((const uint8_t *)&lastT, SZ32);
-        f.write((const uint8_t *)&lastLat, SZ32);
-        f.write((const uint8_t *)&lastLon, SZ32);
-        p = 1;
-    }
+		f.write((const uint8_t *)&lastT, SZ32);
+		f.write((const uint8_t *)&lastLat, SZ32);
+		f.write((const uint8_t *)&lastLon, SZ32);
+		p = 1;
+	}
 
-    for (; p < pointsInFileCache; ++p) {
-        int32_t latSi = (int32_t)lround(writeCache[p].lat * SCALE);
-        int32_t lonSi = (int32_t)lround(writeCache[p].lon * SCALE);
-        uint32_t ti   = (uint32_t)(writeCache[p].time);
+	for (; p < pointsInFileCache; ++p)
+	{
+		int32_t latSi = (int32_t)lround(writeCache[p].lat * SCALE);
+		int32_t lonSi = (int32_t)lround(writeCache[p].lon * SCALE);
+		uint32_t ti = (uint32_t)(writeCache[p].time);
 
-        int32_t dLat = latSi - lastLat;
-        int32_t dLon = lonSi - lastLon;
+		int32_t dLat = latSi - lastLat;
+		int32_t dLon = lonSi - lastLon;
 
-        // dT Schutz gegen Zeit-Sprünge (z.B. GPS-Fix Korrektur nach hinten)
-        uint32_t dT = (ti >= lastT) ? (ti - lastT) : 0;
+		// dT Schutz gegen Zeit-Sprünge (z.B. GPS-Fix Korrektur nach hinten)
+		uint32_t dT = (ti >= lastT) ? (ti - lastT) : 0;
 
-        lastLat = latSi;
-        lastLon = lonSi;
-        lastT = ti;
+		lastLat = latSi;
+		lastLon = lonSi;
+		lastT = ti;
 
-        writeVarUint(dT);
-        writeVarUint(zigzagEncode(dLat));
-        writeVarUint(zigzagEncode(dLon));
-    }
+		writeVarUint(dT);
+		writeVarUint(zigzagEncode(dLat));
+		writeVarUint(zigzagEncode(dLon));
+	}
 
-    f.flush();
+	f.flush();
 
-    pointsWritten += pointsInFileCache;
-    pointsInFileCache = 0;
+	pointsWritten += pointsInFileCache;
+	pointsInFileCache = 0;
 
 	logd("Points written: %d", pointsWritten);
-
 }
 
-void logfileW::flush() {
-    xSemaphoreTake(logfile_sem, portMAX_DELAY);
+void logfileW::flush()
+{
+	xSemaphoreTake(logfile_sem, portMAX_DELAY);
 	_flush_unlocked();
-    xSemaphoreGive(logfile_sem);
+	xSemaphoreGive(logfile_sem);
 }
 
 void logfileW::intervalFlush()
@@ -175,7 +185,7 @@ void logfileW::intervalFlush()
 }
 /****************************************************************************************************************************/
 #pragma GCC push_options
-#pragma GCC optimize ("O2")
+#pragma GCC optimize("O2")
 
 bool logfileR::readVarUint(uint32_t &out)
 {
@@ -184,7 +194,7 @@ bool logfileR::readVarUint(uint32_t &out)
 	uint tries = 0;
 	while (true)
 	{
-		int r = f.read();
+		int r = bufferedRead();
 		if (r < 0)
 			return false; // EOF oder Fehler
 		uint8_t b = (uint8_t)r;
@@ -201,69 +211,94 @@ bool logfileR::readVarUint(uint32_t &out)
 
 inline int32_t logfileR::zigzagDecode(uint32_t v)
 {
-	return (int32_t)((v >> 1) ^ (-(int32_t)(v & 1)));
+	return (int32_t)((v >> 1) ^ -(int32_t)(v & 1));
 }
 
-bool logfileR::readPoint(GPSPoint_t &p) {
-    bool isAbsolute = (pointsRead == 0);
-    uint32_t vT = 0;
+bool logfileR::readPoint(GPSPoint_t &p)
+{
+	bool isAbsolute = (pointsRead == 0);
+	uint32_t vT = 0;
 
-    // 1. Entscheidung: Lesen wir Deltas oder Absolute Werte?
-    if (!isAbsolute) {
-        if (!readVarUint(vT)) return false;
-        if (vT == APPEND_MARKER) {
-            isAbsolute = true; // Marker gefunden -> umschalten auf Absolut-Modus
-        }
-    }
+	// 1. Entscheidung: Lesen wir Deltas oder Absolute Werte?
+	if (!isAbsolute)
+	{
+		if (!readVarUint(vT))
+			return false;
+		if (vT == APPEND_MARKER)
+		{
+			isAbsolute = true; // Marker gefunden -> umschalten auf Absolut-Modus
+		}
+	}
 
-    // 2. Daten einlesen
-    if (isAbsolute) {
-        int32_t buf[3]; // t, lat, lon
-        if (f.read((uint8_t *)buf, SZ32 * 3) != SZ32 * 3) return false;
-        lastT   = (uint32_t)buf[0];
-        lastLat = buf[1];
-        lastLon = buf[2];
-    } else {
-        uint32_t vLat, vLon;
-        if (!readVarUint(vLat)) return false;
-        if (!readVarUint(vLon)) return false;
+	// 2. Daten einlesen
+	if (isAbsolute)
+	{
+		if (bufferedRead((uint8_t *)&lastT, SZ32) != SZ32)
+			return false;
+		if (bufferedRead((uint8_t *)&lastLat, SZ32) != SZ32)
+			return false;
+		if (bufferedRead((uint8_t *)&lastLon, SZ32) != SZ32)
+			return false;
+	}
+	else
+	{
+		uint32_t vLat, vLon;
+		if (!readVarUint(vLat))
+			return false;
+		if (!readVarUint(vLon))
+			return false;
 
-        lastT   += vT;
-        lastLat += zigzagDecode(vLat);
-        lastLon += zigzagDecode(vLon);
-    }
+		lastT += vT;
+		lastLat += zigzagDecode(vLat);
+		lastLon += zigzagDecode(vLon);
+	}
 
-    // 3. Ergebnisstruktur befüllen
-    p.lat    = (double)lastLat * RSCALE;
-    p.lon    = (double)lastLon * RSCALE;
-    p.time   = (time_t)lastT;
+	// 3. Ergebnisstruktur befüllen
+	p.lat = (double)lastLat * RSCALE;
+	p.lon = (double)lastLon * RSCALE;
+	p.time = (time_t)lastT;
 
-    pointsRead++;
-    return true;
+	pointsRead++;
+	return true;
+}
+
+// Buffered read helpers for logfileR
+int logfileR::bufferedRead()
+{
+	if (!f)
+		return -1;
+	if (readBufPos >= readBufLen)
+	{
+		readBufLen = f.read(readBuf, READBUF_SIZE);
+		readBufPos = 0;
+		if (readBufLen == 0)
+			return -1;
+	}
+	return (int)readBuf[readBufPos++];
+}
+
+size_t logfileR::bufferedRead(uint8_t *dst, size_t len)
+{
+	if (!f)
+		return 0;
+	size_t total = 0;
+	while (total < len)
+	{
+		if (readBufPos >= readBufLen)
+		{
+			readBufLen = f.read(readBuf, READBUF_SIZE);
+			readBufPos = 0;
+			if (readBufLen == 0)
+				break; // EOF
+		}
+		size_t avail = readBufLen - readBufPos;
+		size_t want = (len - total);
+		size_t toCopy = (avail < want) ? avail : want;
+		memcpy(dst + total, readBuf + readBufPos, toCopy);
+		readBufPos += toCopy;
+		total += toCopy;
+	}
+	return total;
 }
 
 #pragma GCC pop_options
-
-/*
-	Liest Anzahl der aufgezeichneten Punkte, und Zeitpunkt des ersten und letzen Trackpoints
-	Evtl irgendwann nützlich (bisher nicht benötigt)
-*/
-size_t logfileR::getFileInfo(GPSPoint_t &firstp, GPSPoint_t &lastp)
-{
-	// uint32_t m = micros();
-	if (!f)
-		return 0;
-	f.seek(0);
-	pointsRead = 0;
-
-	firstp = lastp = {0};
-
-	if (!readPoint(firstp))
-		return 0;
-
-	while (readPoint(lastp))
-		;
-
-	// logi("%s: #%u %llu, %llu (%u ms)", path, pts, firstp.time, lastp.time, (micros() - m) / 1000);
-	return pointsRead;
-}

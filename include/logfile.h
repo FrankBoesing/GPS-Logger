@@ -66,11 +66,13 @@ public:
 		f.close();
 		f = LittleFS.open(filename, FILE_READ);
 		pointsRead = 0;
+        // Reset read buffer
+        readBufPos = readBufLen = 0;
 		return (f && !f.isDirectory());
 	}
-	void close() { f.close(); }
+	void close() { f.close(); readBufPos = readBufLen = 0; }
 	bool readPoint(GPSPoint_t &p);
-	size_t getFileInfo(GPSPoint_t &firstp, GPSPoint_t &lastp);
+
 	operator bool() const { return f; }
 
 protected:
@@ -82,4 +84,13 @@ private:
 	uint32_t lastT;
 	bool readVarUint(uint32_t &out);
 	inline int32_t zigzagDecode(uint32_t v);
+
+	// Buffered read support
+	static constexpr size_t READBUF_SIZE = 256;
+	uint8_t readBuf[READBUF_SIZE];
+	size_t readBufPos = 0;
+	size_t readBufLen = 0;
+
+	int bufferedRead();
+	size_t bufferedRead(uint8_t *dst, size_t len);
 };
