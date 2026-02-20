@@ -82,5 +82,4 @@ private:
 	uint32_t lastT;
 	bool readVarUint(uint32_t &out);
 	inline int32_t zigzagDecode(uint32_t v);
-	bool readAbsolute(GPSPoint_t &p);
 };

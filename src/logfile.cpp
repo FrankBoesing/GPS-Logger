@@ -20,7 +20,7 @@ void initLogfile()
 static constexpr long SCALE = 10000000L;
 static constexpr double RSCALE = 1.0 / SCALE;
 static constexpr size_t SZ32 = sizeof(int32_t);
-static constexpr uint32_t MAGIC = 0xbabeef;
+static constexpr uint32_t APPEND_MARKER = 0xFFFFFFFF;
 
 // Eine Klasse ist hier am praktischten:
 
@@ -119,7 +119,7 @@ void  logfileW::_flush_unlocked() {
 
     if (pointsWritten == 0) {
         if (f.size() > 0) {
-            writeVarUint(MAGIC); // Anfüge-Marker
+            writeVarUint(APPEND_MARKER); // Anfüge-Marker
         }
 
         // Erster Punkt unkomprimiert (immer double -> int32)
@@ -204,47 +204,39 @@ inline int32_t logfileR::zigzagDecode(uint32_t v)
 	return (int32_t)((v >> 1) ^ (-(int32_t)(v & 1)));
 }
 
-bool logfileR::readAbsolute(GPSPoint_t &p)
-{
-	uint32_t latS_u, lonS_u, t_u;
-
-	f.read((uint8_t *)&t_u, SZ32);
-	f.read((uint8_t *)&latS_u, SZ32);
-	if (!f.read((uint8_t *)&lonS_u, SZ32))
-		return false;
-
-	lastLat = (int32_t)latS_u;
-	lastLon = (int32_t)lonS_u;
-	lastT = t_u;
-
-	p.lat = lastLat * RSCALE;
-	p.lon = lastLon * RSCALE;
-	p.time = (time_t)lastT;
-	pointsRead++;
-	return true;
-}
-
 bool logfileR::readPoint(GPSPoint_t &p) {
-    if (pointsRead == 0) return readAbsolute(p);
+    bool isAbsolute = (pointsRead == 0);
+    uint32_t vT = 0;
 
-    uint32_t vT;
-    if (!readVarUint(vT)) return false;
+    // 1. Entscheidung: Lesen wir Deltas oder Absolute Werte?
+    if (!isAbsolute) {
+        if (!readVarUint(vT)) return false;
+        if (vT == APPEND_MARKER) {
+            isAbsolute = true; // Marker gefunden -> umschalten auf Absolut-Modus
+        }
+    }
 
-    // Falls wir an einen MAGIC Marker stoßen (append-Stelle)
-    if (vT == MAGIC) return readAbsolute(p);
+    // 2. Daten einlesen
+    if (isAbsolute) {
+        int32_t buf[3]; // t, lat, lon
+        if (f.read((uint8_t *)buf, SZ32 * 3) != SZ32 * 3) return false;
+        lastT   = (uint32_t)buf[0];
+        lastLat = buf[1];
+        lastLon = buf[2];
+    } else {
+        uint32_t vLat, vLon;
+        if (!readVarUint(vLat)) return false;
+        if (!readVarUint(vLon)) return false;
 
-    uint32_t vLat, vLon;
-    if (!readVarUint(vLat)) return false;
-    if (!readVarUint(vLon)) return false;
+        lastT   += vT;
+        lastLat += zigzagDecode(vLat);
+        lastLon += zigzagDecode(vLon);
+    }
 
-    lastT   += vT;
-    lastLat += zigzagDecode(vLat);
-    lastLon += zigzagDecode(vLon);
-
-    // Rückrechnung von int32_t zu double
-    p.lat  = (double)lastLat * RSCALE;
-    p.lon  = (double)lastLon * RSCALE;
-    p.time = (time_t)lastT;
+    // 3. Ergebnisstruktur befüllen
+    p.lat    = (double)lastLat * RSCALE;
+    p.lon    = (double)lastLon * RSCALE;
+    p.time   = (time_t)lastT;
 
     pointsRead++;
     return true;

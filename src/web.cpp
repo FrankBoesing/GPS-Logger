@@ -80,6 +80,7 @@ static constexpr char GPXHEADER[] = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\
 static constexpr char GPXFOOTER[] = "</trkseg></trk>\n</gpx>";
 static constexpr char TRACKHEAD[] = "<trkpt lat=\"%.7f\" lon=\"%.7f\"><time>";
 static constexpr char TRACKFOOTER[] = "</time></trkpt>\n";
+static constexpr int TRACK_WORST_CASE_LEN = strlen(TRACKHEAD) + 2 * 12 + 20 + strlen(TRACKFOOTER) + 1;
 
 enum DLState
 {
@@ -107,7 +108,8 @@ struct DContext
 };
 static DContext dlCtx;
 static SemaphoreHandle_t semDL;
-static inline size_t formatIsoTime(char* buffer, const struct tm *tm);
+static inline int formatGpxTime(char* buf, time_t t);
+
 
 /* Chunked Download mit Konvertierung vom Binär- ins xml Format */
 void download(AsyncWebServerRequest *request)
@@ -163,10 +165,9 @@ void download(AsyncWebServerRequest *request)
             break;
 
         case Points:
-            while (pos + 128 <= maxLen)
+            while (pos + TRACK_WORST_CASE_LEN <= maxLen)
             {
                 GPSPoint_t point;
-                struct tm tm;
                 if (!dlCtx.f.readPoint(point))
                 {
                     dlCtx.state = Footer;
@@ -177,17 +178,15 @@ void download(AsyncWebServerRequest *request)
                 pos += snprintf((char *)buffer + pos, maxLen - pos, TRACKHEAD, point.lat, point.lon);
 
                 // 2. Zeit direkt an die aktuelle Position schreiben
-                if (pos + 20 < maxLen) {
-					gmtime_r(&point.time, &tm);
-                    pos += formatIsoTime((char *)buffer + pos, &tm);
-                }
+				int timeLen = formatGpxTime((char *)buffer + pos, point.time);
+        		assert(timeLen == 20);
+        		pos += timeLen;
 
                 // 3. Rest anhängen (ohne das Null-Byte von sizeof)
                 const size_t footLen = sizeof(TRACKFOOTER) - 1;
-                if (pos + footLen < maxLen) {
-                    memcpy((char *)buffer + pos, TRACKFOOTER, footLen);
-                    pos += footLen;
-                }
+
+                memcpy((char *)buffer + pos, TRACKFOOTER, footLen);
+                pos += footLen;
             }
             break;
 
@@ -355,44 +354,45 @@ void setupWebServer()
 	server.begin();
 }
 
-//Sehr viel schneller als snprintf..
-static inline size_t formatIsoTime(char* buffer, const struct tm *tm)
+//Sehr viel schneller als gmtime+snprintf..
+static inline int formatGpxTime(char* buf, time_t t)
 {
-    char* p = buffer;
+    static time_t lastDayEpoch = 0;
+    static struct tm ltm;
 
-    // Jahr (4-stellig)
-    int year = tm->tm_year + 1900;
+    // Umwandlung in unsigned für den Vergleich, um signed-overflow Warnung zu vermeiden
+    uint32_t ut = (uint32_t)t;
+    uint32_t uLastDay = (uint32_t)lastDayEpoch;
+
+    // Prüfen, ob wir außerhalb des aktuellen 24h-Fensters liegen
+    if (ut < uLastDay || ut >= uLastDay + 86400UL) {
+        gmtime_r(&t, &ltm);
+        lastDayEpoch = t - (t % 86400);
+    } else {
+        uint32_t secInDay = ut % 86400UL;
+        ltm.tm_hour = secInDay / 3600;
+        ltm.tm_min = (secInDay % 3600) / 60;
+        ltm.tm_sec = secInDay % 60;
+    }
+
+    char* p = buf;
+    int year = ltm.tm_year + 1900;
     *p++ = (year / 1000) + '0';
     *p++ = ((year / 100) % 10) + '0';
     *p++ = ((year / 10) % 10) + '0';
     *p++ = (year % 10) + '0';
     *p++ = '-';
 
-    // Monat
-    int mon = tm->tm_mon + 1;
-    *p++ = (mon / 10) + '0';
-    *p++ = (mon % 10) + '0';
-    *p++ = '-';
+    auto digits = [](char* ptr, int val) {
+        *ptr++ = (val / 10) + '0';
+        *ptr   = (val % 10) + '0';
+    };
 
-    // Tag
-    *p++ = (tm->tm_mday / 10) + '0';
-    *p++ = (tm->tm_mday % 10) + '0';
-    *p++ = 'T';
+    digits(p, ltm.tm_mon + 1); p += 2; *p++ = '-';
+    digits(p, ltm.tm_mday);    p += 2; *p++ = 'T';
+    digits(p, ltm.tm_hour);    p += 2; *p++ = ':';
+    digits(p, ltm.tm_min);     p += 2; *p++ = ':';
+    digits(p, ltm.tm_sec);     p += 2; *p++ = 'Z';
 
-    // Stunde
-    *p++ = (tm->tm_hour / 10) + '0';
-    *p++ = (tm->tm_hour % 10) + '0';
-    *p++ = ':';
-
-    // Minute
-    *p++ = (tm->tm_min / 10) + '0';
-    *p++ = (tm->tm_min % 10) + '0';
-    *p++ = ':';
-
-    // Sekunde
-    *p++ = (tm->tm_sec / 10) + '0';
-    *p++ = (tm->tm_sec % 10) + '0';
-    *p++ = 'Z';
-
-    return 20; // Die Länge von "YYYY-MM-DDTHH:MM:SSZ"
+    return p - buf; // =20
 }

@@ -27,7 +27,7 @@
 
 // ---------- System ----------
 #define WIFI_MAX_NETWORKS 5
-#define WiFI_MAX_POWER 6 // dBm, max 20 (ESP32-C3 Noname Boards oft am besten mit ~8 dBm. Höhere Werte bringen meist nichts)
+#define WiFI_MAX_POWER 5 // dBm, max 20 (ESP32-C3 Noname Boards oft am besten mit ~8 dBm. Höhere Werte bringen meist nichts)
 
 #define ENABLE_HEAT_REDUCTION true
 
@@ -40,6 +40,7 @@
 #define CPU_FREQ_DEFAULT       CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ
 
 /*****************************************************************************************************/
+
 #ifdef LED
 
 #ifdef LED_INVERTED
