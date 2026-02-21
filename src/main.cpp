@@ -3,7 +3,9 @@
 #include <WiFiMulti.h>
 #include <TinyGPSPlus.h>
 
-WiFiMulti wifiMulti;
+static WiFiMulti wifiMulti;
+static TinyGPSPlus gps;
+
 std::atomic<log_mode_t> logMode = NOLOG;
 std::atomic<bool> logAppend = true;
 std::atomic<log_cmd_t> logCmd = NOPE;
@@ -17,9 +19,9 @@ gps_state_ctx_t gps_state = {};
 /****************************************************************************************************************************/
 /****************************************************************************************************************************/
 
-static void saveToGPSLog(TinyGPSPlus &gps, const time_t &utc);
+static void saveToGPSLog(const time_t &utc);
 
-static void timeFromGPS(TinyGPSPlus &gps, time_t &utc)
+static void timeFromGPS(time_t &utc)
 {
 	if (!gps.time.isValid() || !gps.date.isValid() || gps.date.month() < 1)
 		return;
@@ -55,7 +57,6 @@ static void timeFromGPS(TinyGPSPlus &gps, time_t &utc)
 
 static void handleGPSData()
 {
-	static TinyGPSPlus gps;
 	int ch;
 
 	while ((ch = GPSSerial.read()) >= 0)
@@ -80,8 +81,8 @@ static void handleGPSData()
 			LEDON();
 
 			time_t utc = 0;
-			timeFromGPS(gps, utc);
-			saveToGPSLog(gps, utc);
+			timeFromGPS(utc);
+			saveToGPSLog(utc);
 
 			LEDOFF();
 			return;
@@ -119,7 +120,7 @@ static void startStop(const time_t &utc)
 
 /****************************************************************************************************************************/
 #define TIME_GPS_HANDLING false
-static void saveToGPSLog(TinyGPSPlus &gps, const time_t &utc) // Wird sekündlich aufgerufen
+static void saveToGPSLog(const time_t &utc) // Wird sekündlich aufgerufen
 {
 	static time_t prevUtc = 0;
 
@@ -186,7 +187,7 @@ static void error(const char *msg = nullptr)
 	if (msg)
 		strlcpy(err, msg, sizeof(err));
 
-	if (err[0] && interval(t, 80)) {
+	if (err[0] && interval(t, 500)) {
 			LEDTOGGLE();
 			loge("%s", err);
 		}
@@ -202,12 +203,6 @@ void setup()
 	Serial.begin(115200);
 	initRamLogging();
 	yield();
-
-	GPSSerial.setRxBufferSize(512);
-	GPSSerial.begin(GPS_BAUD, SERIAL_8N1, GPS_RX_PIN, GPS_TX_PIN);
-	while (GPSSerial.read() >= 0)
-		;
-	GPSSerial.setTimeout(5000);
 
 	wifiCreds.resize(WIFI_MAX_NETWORKS);
 	if (!LittleFS.begin(false))
@@ -237,15 +232,19 @@ void setup()
 	yield();
 
 	initLogfile();
+	initTelnetLogging();
 	setupWebServer();
+
 	yield();
+
+	//GPSSerial.setRxBufferSize(512);
+	if (!hwinit())
+		error("GPS nicht verbunden.");
 
 	cleanupStorage();
 	readFileList(FILE_SUFFIX);
-	yield();
-
 	initOTA();
-	initTelnetLogging();
+
 	yield();
 
 	logi("---- Access Point  ----");
@@ -253,11 +252,6 @@ void setup()
 	logi("AP-Passwort: %s", AP_PASS);
 	logi("AP-IP      : %s", WiFi.softAPIP().toString().c_str());
 	logi("-----------------------");
-
-	if (!GPSSerial.find("\n"))
-		error("GPS nicht verbunden.");
-	hwinit();
-	yield();
 
 	if (logMode == LOGAUTOSTART)
 		logCmd = STARTNOW;

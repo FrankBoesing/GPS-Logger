@@ -1,4 +1,46 @@
 #include "includes.h"
+
+constexpr int GPS_TARGET_BAUD = 115200;
+constexpr int BAUDS[] = {115200, 9600, 38400, 57600, 4800};
+
+static int setGPSSerialBaud(int baud)
+{
+	GPSSerial.begin(baud, SERIAL_8N1, GPS_RX_PIN, GPS_TX_PIN);
+	return baud;
+}
+
+static void endSerial()
+{
+	GPSSerial.end();
+	delay(10); // Kurze Beruhigungspause für die Hardware
+}
+
+static int findBauds()
+{
+	for (int b : BAUDS)
+	{
+		logd("GPS Teste %d bit/s", b);
+		setGPSSerialBaud(b);
+
+		unsigned long start = millis();
+		char lastChar = 0;
+
+		while (millis() - start < 1200)
+		{
+			if (GPSSerial.available())
+			{
+				char c = GPSSerial.read();
+				if (lastChar == '\n' && c == '$')
+					return b;
+				lastChar = c;
+			}
+			yield();
+		}
+		endSerial();
+	}
+	return 0;
+}
+
 /****************************************************************************************************************************/
 #if GPS_MODEL == UBLOX
 
@@ -11,7 +53,7 @@ static void sendUBXCommand(const uint8_t *cmd, const size_t size)
 		return;
 
 	// Sync schreiben:
-	GPSSerial.write((const uint8_t*)&SYNC, sizeof(SYNC));
+	GPSSerial.write((const uint8_t *)&SYNC, sizeof(SYNC));
 
 	const size_t lenPayload = ((size_t)cmd[3] << 8) | (size_t)cmd[2];
 	uint8_t ckA = 0, ckB = 0;
@@ -32,68 +74,110 @@ static void sendUBXCommand(const uint8_t *cmd, const size_t size)
 
 	GPSSerial.write(ckA);
 	GPSSerial.write(ckB);
+	yield();
 	GPSSerial.flush();
 }
 
 /****************************************************************************************************************************/
 
-void hwinit()
-{
-	logv("GPS HW init.");
+constexpr uint8_t CFG_PRT_BAUD[] = {
+	0x06, 0x00,				// Class, ID (CFG-PRT)
+	0x14, 0x00,				// Length (20 bytes)
+	0x01,					// portID = UART1
+	0x00,					// reserved
+	0x00, 0x00,				// txReady
+	0xD0, 0x08, 0x00, 0x00, // mode = 0x08D0 (8N1)
+	(uint8_t)(GPS_TARGET_BAUD & 0xFF), (uint8_t)((GPS_TARGET_BAUD >> 8) & 0xFF),
+	(uint8_t)((GPS_TARGET_BAUD >> 16) & 0xFF), (uint8_t)((GPS_TARGET_BAUD >> 24) & 0xFF),
+	0x07, 0x00, // inProtoMask
+	0x07, 0x00, // outProtoMask
+	0x00, 0x00, // flags
+	0x00, 0x00	// reserved
+};
 
-	if (0) //  Warmstart. Eigentlich nicht notwendig. Setzt die Konfig auch nicht zurück.
+constexpr uint8_t CFG_RATE[] = {
+	0x06, 0x08, 0x06, 0x00, // CFG-RATE, Payload length 6
+	200, 0,					// measRate = 200 ms
+	5, 0,					// navRate = 5 -> (200ms * 5 = 1 Sekunde)
+	1, 0					// timeRef = 1 (GPS time)
+};
+
+constexpr uint8_t CFG_NAV5[] = {
+	// Page 231, Navigation engine settings  UBX-CFG-NAV5
+	0x06, 0x24, 0x24, 0x00,
+	0xFF, 0xFF,				// Mask = alles
+	4,						// Dynamic platform model: Automotive Default: 0
+	0x03,					// Auto 2d/3d
+	0x00, 0x00, 0x00, 0x00, // fixed Alt
+	0x10, 0x27, 0x00, 0x00, // fixed Alt var
+	0x05,					// min Elevation °
+	0x00,					// Reserved
+	0xFA, 0x00,				// pDop Mask
+	0xFA, 0x00,				// tDop Mask
+	100, 0x00,				// min Position Accuracy (m) Default: 100m
+	0x5E, 0x01,				// Time Accuracy (350)
+	50,						// static Hold theshold (cm/s) (0.5m/s) Default: 0
+	0x3C,					// DGNSS timeout
+	0x00,					// cnoThreshNumSVs
+	0x00,					// cnoThresh
+	0x00, 0x00,				// Reserved
+	5, 0x00,				// staticHoldMax Dist (m) Default: 0
+	0x00					// utc Standard
+};
+
+constexpr uint8_t CFG_MSG_$GNGLL[] = {0x06, 0x01, 0x08, 0x00, 0xF0, 0x01};
+constexpr uint8_t CFG_MSG_$GNGSA[] = {0x06, 0x01, 0x08, 0x00, 0xF0, 0x02};
+constexpr uint8_t CFG_MSG_$GPGSV[] = {0x06, 0x01, 0x08, 0x00, 0xF0, 0x03};
+constexpr uint8_t CFG_MSG_$GNVTG[] = {0x06, 0x01, 0x08, 0x00, 0xF0, 0x05};
+
+bool hwinit()
+{
+	logd("GPS HW init.");
+
+	// 1. Baudrate finden
+	int baud = findBauds();
+
+	if (baud == 0)
 	{
-		constexpr uint8_t CFG_RST[] = {0x06, 0x04, 0x04, 0x00, 0x01, 0x00, 0x09};
-		sendUBXCommand(CFG_RST, sizeof(CFG_RST));
-		logi("Ublox Warmstart");
-		delay(500);
+		loge("No GPS found.");
+		return false;
 	}
 
-	constexpr uint8_t CFG_RATE[] = {
-		0x06, 0x08, 0x06, 0x00, // CFG-RATE, Payload length 6
-		200, 0,					// measRate = 200 ms
-		5, 0,					// navRate = 5 -> (200ms * 5 = 1 Sekunde)
-		1, 0					// timeRef = 1 (GPS time)
-	};
+	// 2. Konfiguration nur wenn Baudrate nicht dem Ziel entspricht
+	if (baud < GPS_TARGET_BAUD)
+	{
+		if (baud < GPS_TARGET_BAUD)
+		{
+			logd("Switching from %d to %d...", baud, GPS_TARGET_BAUD);
+			sendUBXCommand(CFG_PRT_BAUD, sizeof(CFG_PRT_BAUD));
+			endSerial();
+			setGPSSerialBaud(GPS_TARGET_BAUD);
+			GPSSerial.setTimeout(1200);
+			if (!GPSSerial.find("$"))
+			{
+				loge("Switching failed");
+				endSerial();
+				setGPSSerialBaud(baud);
+				return true; // dann bleiben wir halt bei der alten baudrate...
+			}
+			baud = GPS_TARGET_BAUD;
+		}
+	}
+
+	logi("Using baud: %d", baud);
+
+	// Weitere Konfigurationen senden
+	logd("Sending UBX Configuration...");
 	sendUBXCommand(CFG_RATE, sizeof(CFG_RATE));
-
-	// Page 231, Navigation engine settings  UBX-CFG-NAV5
-
-	constexpr uint8_t CFG_NAV5[] = {
-		0x06, 0x24, 0x24, 0x00,
-		0xFF, 0xFF,				// Mask = alles
-		4,						// Dynamic platform model: Automotive Default: 0
-		0x03,					// Auto 2d/3d
-		0x00, 0x00, 0x00, 0x00, // fixed Alt
-		0x10, 0x27, 0x00, 0x00, // fixed Alt var
-		0x05,					// min Elevation °
-		0x00,					// Reserved
-		0xFA, 0x00,				// pDop Mask
-		0xFA, 0x00,				// tDop Mask
-		100, 0x00,				// min Position Accuracy (m) Default: 100m
-		0x5E, 0x01,				// Time Accuracy (350)
-		50,						// static Hold theshold (cm/s) (0.5m/s) Default: 0
-		0x3C,					// DGNSS timeout
-		0x00,					// cnoThreshNumSVs
-		0x00,					// cnoThresh
-		0x00, 0x00,				// Reserved
-		5, 0x00,				// staticHoldMax Dist (m) Default: 0
-		0x00					// utc Standard
-	};
 	sendUBXCommand(CFG_NAV5, sizeof(CFG_NAV5));
 
-	// NMEA - unbenötigte Nachrichten abschalten
-	constexpr uint8_t CFG_MSG_$GNGLL[] = {0x06, 0x01, 0x08, 0x00, 0xF0, 0x01};
+	// Unnötige NMEA Nachrichten deaktivieren
 	sendUBXCommand(CFG_MSG_$GNGLL, sizeof(CFG_MSG_$GNGLL));
-
-	constexpr uint8_t CFG_MSG_$GNGSA[] = {0x06, 0x01, 0x08, 0x00, 0xF0, 0x02};
 	sendUBXCommand(CFG_MSG_$GNGSA, sizeof(CFG_MSG_$GNGSA));
-
-	constexpr uint8_t CFG_MSG_$GPGSV[] = {0x06, 0x01, 0x08, 0x00, 0xF0, 0x03};
 	sendUBXCommand(CFG_MSG_$GPGSV, sizeof(CFG_MSG_$GPGSV));
-
-	constexpr  uint8_t CFG_MSG_$GNVTG[] = {0x06, 0x01, 0x08, 0x00, 0xF0, 0x05};
 	sendUBXCommand(CFG_MSG_$GNVTG, sizeof(CFG_MSG_$GNVTG));
+
+	return true;
 }
 
 /*
@@ -106,5 +190,5 @@ void hwinit()
 */
 
 #else
-void hwinit() {};
+bool hwinit() { return findBauds() > 0; };
 #endif // UBX

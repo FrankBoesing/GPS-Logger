@@ -1,6 +1,6 @@
 #pragma once
 
-void hwinit();
+bool hwinit();
 
 // User Equivalent Range Error :
 
