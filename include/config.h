@@ -41,14 +41,18 @@
 
 /*****************************************************************************************************/
 
+#ifndef CORE_DEBUG_LEVEL
+#define CORE_DEBUG_LEVEL ARDUHAL_LOG_LEVEL_WARN
+#endif
+
 #ifdef LED
 
 #ifdef LED_INVERTED
-    #define LED_ACTIVE_LEVEL   HIGH
-    #define LED_INACTIVE_LEVEL LOW
-#else
     #define LED_ACTIVE_LEVEL   LOW
     #define LED_INACTIVE_LEVEL HIGH
+#else
+    #define LED_ACTIVE_LEVEL   HIGH
+    #define LED_INACTIVE_LEVEL LOW
 #endif
 
 #define LEDON() do { digitalWrite(LED, LED_ACTIVE_LEVEL); } while (0)

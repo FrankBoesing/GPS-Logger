@@ -62,15 +62,15 @@ static void handleGPSData()
 	while ((ch = GPSSerial.read()) >= 0)
 	{
 		// Rohdaten ausgeben:
-		if (false && CORE_DEBUG_LEVEL >= ARDUHAL_LOG_LEVEL_VERBOSE)
+		if (true && CORE_DEBUG_LEVEL > ARDUHAL_LOG_LEVEL_DEBUG)
 		{
 			static char buf[128];
 			static size_t buflen = 0;
 			if (ch == '\n' && buflen > 0)
 			{
 				buf[buflen] = 0;
+				logv(buf);
 				buflen = 0;
-				Serial.println(buf);
 			}
 			else if (buflen < sizeof(buf) - 1)
 				buf[buflen++] = (char)ch;
@@ -85,7 +85,7 @@ static void handleGPSData()
 			saveToGPSLog(utc);
 
 			LEDOFF();
-			return;
+			yield();
 		}
 	}
 }
@@ -259,6 +259,7 @@ void setup()
 	logi("Setup abgeschlossen.");
 
 	LEDOFF();
+
 }
 
 /****************************************************************************************************************************/
@@ -270,6 +271,5 @@ void loop()
 	error();
 	yield();
 	handleGPSData();
-	yield();
 	boost();
 }

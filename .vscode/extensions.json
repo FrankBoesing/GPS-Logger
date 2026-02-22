@@ -1,0 +1,9 @@
+{
+    "recommendations": [
+        "actboy168.tasks",
+        "pioarduino.pioarduino-ide"
+    ],
+    "unwantedRecommendations": [
+        "ms-vscode.cpptools-extension-pack"
+    ]
+}

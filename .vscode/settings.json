@@ -2,6 +2,5 @@
     "files.trimTrailingWhitespace": true,
     "editor.insertSpaces": false,
     "editor.tabSize": 4,
-	"editor.detectIndentation": false,
-	"C_Cpp.errorSquiggles": "disabled"
+	"editor.detectIndentation": false
 }
